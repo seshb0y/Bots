@@ -1,5 +1,5 @@
 // index.ts
-import { Client, GatewayIntentBits, GuildMember, Interaction } from 'discord.js';
+import { Client, GatewayIntentBits, GuildMember, Interaction, Message, User } from 'discord.js';
 import * as cheerio from 'cheerio';
 import { config } from 'dotenv';
 import * as fs from 'fs';
@@ -216,14 +216,24 @@ setInterval(async () => {
       const user = await client.users.fetch(data.assignedBy);
       data.lastPoints = points;
 
-      if (days >= 7 && points < 700 && !data.warnedAfter7d) {
-        await user.send(`⚠️ Игрок ${nick} имеет менее 700 очков спустя 7 дней.`);
-        data.warnedAfter7d = true;
-      }
+      if (points >= 700) {
+        // Игрок набрал 700 очков, удаляем его из отслеживания
+        if (data.warnedAfter7d || data.warnedAfter14d) {
+          await user.send(`🎉 Игrok ${nick} набрал ${points} очков и удалён из отслеживания.`);
+        }
+        delete tracked[nick];
+        updated = true;
+      } else {
+        // Логика для игроков с менее чем 700 очками
+        if (days >= 7 && points < 700 && !data.warnedAfter7d) {
+          await user.send(`⚠️ Игрок ${nick} имеет менее 700 очков спустя 7 дней.`);
+          data.warnedAfter7d = true;
+        }
 
-      if (days >= 14 && points < 700 && !data.warnedAfter14d) {
-        await user.send(`⛔ 14 дней прошло, игрок ${nick} всё ещё не набрал 700 очков. Пора кикать.`);
-        data.warnedAfter14d = true;
+        if (days >= 14 && points < 700 && !data.warnedAfter14d) {
+          await user.send(`⛔ 14 дней прошло, игрок ${nick} всё ещё не набрал 700 очков. Пора кикать.`);
+          data.warnedAfter14d = true;
+        }
       }
     }
 
