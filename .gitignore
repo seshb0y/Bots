@@ -1,0 +1,33 @@
+# Зависимости
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local
+
+# Данные приложения
+data/*.json
+
+# Логи
+logs
+*.log
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Сборка
+dist/
+build/
+*.tsbuildinfo
+
+# Временные файлы
+tmp/
+temp/ 
