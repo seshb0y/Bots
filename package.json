@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev src/index.ts"
+    "dev": "ts-node-dev src/index.ts",
+    "start": "ts-node src/index.ts",
+    "register": "ts-node src/register-commands.ts"
   },
   "keywords": [],
   "author": "",
@@ -14,10 +16,12 @@
     "cheerio": "^1.1.0",
     "discord-api-types": "^0.38.11",
     "discord.js": "^14.19.3",
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.5.0",
+    "pidusage": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.1",
+    "@types/pidusage": "^2.0.5",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"
