@@ -45,6 +45,14 @@ const commands = [
   new SlashCommandBuilder()
     .setName("resources")
     .setDescription("Show current CPU and memory usage of the bot"),
+  new SlashCommandBuilder()
+    .setName("checktracked")
+    .setDescription(
+      "Manually check tracked players and notify officers if needed"
+    ),
+  new SlashCommandBuilder()
+    .setName("stats")
+    .setDescription("Показать статистику изменений очков за сутки по игрокам"),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

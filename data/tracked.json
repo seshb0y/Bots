@@ -4,7 +4,7 @@
     "assignedBy": "623905049051004985",
     "warnedAfter7d": false,
     "warnedAfter14d": false,
-    "lastPoints": 125
+    "lastPoints": 0
   },
   "BOBrinator": {
     "trackedSince": "2025-06-22T20:16:59.817Z",
@@ -19,5 +19,47 @@
     "warnedAfter7d": false,
     "warnedAfter14d": false,
     "lastPoints": 0
+  },
+  "Bentor1": {
+    "trackedSince": "2025-06-23T12:39:56.584Z",
+    "assignedBy": "1011550567266533447",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 0
+  },
+  "Pamver": {
+    "trackedSince": "2025-06-23T13:28:44.317Z",
+    "assignedBy": "331903875240034310",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 556
+  },
+  "PlanB_Raid": {
+    "trackedSince": "2025-06-27T18:23:25.862Z",
+    "assignedBy": "331903875240034310",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 0
+  },
+  "Кумарю": {
+    "trackedSince": "2025-06-28T01:59:19.928Z",
+    "assignedBy": "331903875240034310",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 0
+  },
+  "NonConformist": {
+    "trackedSince": "2025-06-29T17:39:12.833Z",
+    "assignedBy": "331903875240034310",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 1291
+  },
+  "danil_lamberte": {
+    "trackedSince": "2025-07-08T18:51:49.858Z",
+    "assignedBy": "331903875240034310",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 1357
   }
 }
