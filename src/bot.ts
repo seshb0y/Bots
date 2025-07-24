@@ -40,27 +40,140 @@ const client = new Client({
 
 const voiceCounts = new Map<string, number>();
 
+// --- Очередь для канала "замена на полковые бои" ---
+const QUEUE_CHANNEL_ID = "821082995188170783";
+// В памяти: userId -> оригинальный ник
+const originalNicknames: Record<string, string> = {};
+// Очередь: userId[] — порядок участников
+let queueOrder: string[] = [];
+const emojiNumbers = [
+  "1️⃣",
+  "2️⃣",
+  "3️⃣",
+  "4️⃣",
+  "5️⃣",
+  "6️⃣",
+  "7️⃣",
+  "8️⃣",
+  "9️⃣",
+  "🔟",
+];
+
+function stripEmojiNumber(nick: string): string {
+  return nick.replace(/^(1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|6️⃣|7️⃣|8️⃣|9️⃣|🔟)\s*/, "").trim();
+}
+
+async function updateQueueNicknames(guild: any, members: GuildMember[]) {
+  for (let i = 0; i < queueOrder.length; i++) {
+    const userId = queueOrder[i];
+    const member = members.find((m) => m.id === userId);
+    if (!member) continue;
+    const orig =
+      originalNicknames[userId] ||
+      stripEmojiNumber(member.nickname || member.user.username);
+    originalNicknames[userId] = orig;
+    const num = i < emojiNumbers.length ? emojiNumbers[i] : (i + 1).toString();
+    const newNick = `${num} ${orig}`;
+    if (member.nickname !== newNick) {
+      try {
+        await member.setNickname(newNick, "Обновление очереди на полковые бои");
+      } catch (e) {
+        console.log(`[QUEUE] Не удалось изменить ник ${orig}:`, e);
+      }
+    }
+    console.log(`[QUEUE] ${num} ${orig} (ID: ${member.id})`);
+  }
+  // Итоговый порядок очереди
+  console.log("[QUEUE] Итоговый порядок очереди:");
+  for (let i = 0; i < queueOrder.length; i++) {
+    const userId = queueOrder[i];
+    const member = members.find((m) => m.id === userId);
+    if (!member) continue;
+    const orig = originalNicknames[userId];
+    const num = i < emojiNumbers.length ? emojiNumbers[i] : (i + 1).toString();
+    console.log(`[QUEUE] ${num} ${orig} (ID: ${member.id})`);
+  }
+}
+
+async function removeQueueNumber(member: GuildMember | null) {
+  if (!member) return;
+  const orig =
+    originalNicknames[member.id] ||
+    stripEmojiNumber(member.nickname || member.user.username);
+  if (member.nickname !== orig) {
+    try {
+      await member.setNickname(orig, "Выход из очереди на полковые бои");
+    } catch (e) {
+      console.log(`[QUEUE] Не удалось вернуть ник ${orig}:`, e);
+    }
+  }
+  delete originalNicknames[member.id];
+}
+
 client.on("voiceStateUpdate", async (oldState, newState) => {
-  const updatedChannels = new Set<string>();
   const oldChannelId = oldState.channelId;
   const newChannelId = newState.channelId;
-
-  if (oldChannelId) updatedChannels.add(oldChannelId);
-  if (newChannelId) updatedChannels.add(newChannelId);
-
   const guild = oldState.guild || newState.guild;
-
-  for (const channelId of updatedChannels) {
+  // Работаем только с очередным каналом
+  if (oldChannelId === QUEUE_CHANNEL_ID || newChannelId === QUEUE_CHANNEL_ID) {
+    // Получаем актуальных участников канала
+    const channel = await guild.channels.fetch(QUEUE_CHANNEL_ID);
+    const members =
+      channel && channel.isVoiceBased()
+        ? Array.from(channel.members.values())
+            .map((m) => m as GuildMember)
+            .filter((m) => !m.user.bot)
+        : [];
+    const currentIds = members.map((m) => m.id);
+    // Если канал пуст — сбрасываем очередь
+    if (members.length === 0) {
+      // Если кто-то только что вышел — вернуть ему ник
+      if (
+        oldChannelId === QUEUE_CHANNEL_ID &&
+        newChannelId !== QUEUE_CHANNEL_ID &&
+        oldState.member
+      ) {
+        await removeQueueNumber(oldState.member);
+      }
+      queueOrder = [];
+      for (const id of Object.keys(originalNicknames))
+        delete originalNicknames[id];
+      console.log("[QUEUE] Очередь сброшена (канал пуст)");
+      return;
+    }
+    // Удаляем из очереди тех, кого нет в канале
+    queueOrder = queueOrder.filter((id) => currentIds.includes(id));
+    // Добавляем новых в конец очереди
+    for (const m of members) {
+      if (!queueOrder.includes(m.id)) {
+        queueOrder.push(m.id);
+        // Сохраняем оригинальный ник без emoji-номера
+        originalNicknames[m.id] = stripEmojiNumber(
+          m.nickname || m.user.username
+        );
+      }
+    }
+    // Если кто-то вышел — снимаем номер
+    if (
+      oldChannelId === QUEUE_CHANNEL_ID &&
+      newChannelId !== QUEUE_CHANNEL_ID &&
+      oldState.member
+    ) {
+      await removeQueueNumber(oldState.member);
+    }
+    await updateQueueNicknames(guild, members);
+  }
+  // ... существующая логика обновления voiceCounts ...
+  for (const channelId of [oldChannelId, newChannelId]) {
+    if (!channelId) continue;
     try {
       const channel = await guild.channels.fetch(channelId);
       if (channel?.isVoiceBased()) {
         const realCount = Array.from(channel.members.values()).filter(
           (m) => !m.user.bot
         ).length;
-
         const prev = voiceCounts.get(channelId);
         voiceCounts.set(channelId, realCount);
-
         if (prev !== realCount) {
           console.log(
             `🔄 Канал "${channel.name}" обновлён: было ${
@@ -76,11 +189,10 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 });
 
 function getNextStatsDelayMs() {
-  // МСК = UTC+3
+  // Используем системное время
   const now = new Date();
-  const mskNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-  const hour = mskNow.getHours();
-  const minute = mskNow.getMinutes();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
   // Целевые времена: 16:50 и 01:20
   const targets = [
     { h: 16, m: 50 },
@@ -89,17 +201,17 @@ function getNextStatsDelayMs() {
   let minDiff = Infinity;
   let next = null;
   for (const t of targets) {
-    let target = new Date(mskNow);
+    let target = new Date(now);
     target.setHours(t.h, t.m, 0, 0);
-    if (target <= mskNow) target.setDate(target.getDate() + 1);
-    const diff = target.getTime() - mskNow.getTime();
+    if (target <= now) target.setDate(target.getDate() + 1);
+    const diff = target.getTime() - now.getTime();
     if (diff < minDiff) {
       minDiff = diff;
       next = target;
     }
   }
   console.log(
-    `[STATS] Сейчас (МСК): ${mskNow.toLocaleTimeString(
+    `[STATS] Сейчас (сервер): ${now.toLocaleTimeString(
       "ru-RU"
     )}, следующий запуск через ${Math.round(
       minDiff / 1000
@@ -109,11 +221,10 @@ function getNextStatsDelayMs() {
 }
 
 async function statsScheduler(client: Client) {
-  // МСК = UTC+3
+  // Используем системное время
   const now = new Date();
-  const mskNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-  const hour = mskNow.getHours();
-  const minute = mskNow.getMinutes();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
   console.log(
     `[STATS] Проверка времени: ${hour}:${minute < 10 ? "0" + minute : minute}`
   );
