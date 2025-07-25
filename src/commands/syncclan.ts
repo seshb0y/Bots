@@ -24,8 +24,13 @@ export async function syncclanCommand(
   // 1. Загрузить prev и curr до сохранения новых данных
   const [prevMembers, currMembers] = loadPrevAndCurrMembers();
 
+  // Логирование для отладки
+  console.log('[SYNC] prevMembers:', prevMembers.map(m => m.nick));
+  console.log('[SYNC] currMembers:', currMembers.map(m => m.nick));
+
   // 2. Сравнить
   const leavers = findLeavers(prevMembers, currMembers);
+  console.log('[SYNC] leavers:', leavers.map(m => m.nick));
   if (leavers.length > 0) {
     const channel = await interaction.client.channels.fetch(LEAVE_CHANNEL_ID);
     const date = new Date().toLocaleDateString("ru-RU");

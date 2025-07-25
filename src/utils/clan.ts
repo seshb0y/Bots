@@ -37,7 +37,6 @@ export async function fetchClanPoints(
     const points = parseInt(pointsText, 10);
 
     if (nick && !isNaN(points)) {
-      console.log(`🔍 Найден игрок: ${nick} — ${points} очков`);
       members.push({ nick, points });
     }
   }

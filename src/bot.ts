@@ -40,6 +40,9 @@ const client = new Client({
 
 const voiceCounts = new Map<string, number>();
 
+const QUEUE_NICKNAME_EXCLUDE_IDS = [
+  '319425660580003840', // ID владельца сервера
+];
 // --- Очередь для канала "замена на полковые бои" ---
 const QUEUE_CHANNEL_ID = "821082995188170783";
 // В памяти: userId -> оригинальный ник
@@ -66,14 +69,17 @@ function stripEmojiNumber(nick: string): string {
 async function updateQueueNicknames(guild: any, members: GuildMember[]) {
   for (let i = 0; i < queueOrder.length; i++) {
     const userId = queueOrder[i];
-    const member = members.find((m) => m.id === userId);
+    const member = members.find(m => m.id === userId);
     if (!member) continue;
-    const orig =
-      originalNicknames[userId] ||
-      stripEmojiNumber(member.nickname || member.user.username);
+    const orig = originalNicknames[userId] || stripEmojiNumber(member.nickname || member.user.username);
     originalNicknames[userId] = orig;
-    const num = i < emojiNumbers.length ? emojiNumbers[i] : (i + 1).toString();
+    const num = i < emojiNumbers.length ? emojiNumbers[i] : (i+1).toString();
     const newNick = `${num} ${orig}`;
+    if (QUEUE_NICKNAME_EXCLUDE_IDS.includes(userId)) {
+      // Не меняем ник, но логируем
+      console.log(`[QUEUE] (Исключение) Не меняем ник для ${orig} (ID: ${userId}), но учитываем в очереди как номер ${num}`);
+      continue;
+    }
     if (member.nickname !== newNick) {
       try {
         await member.setNickname(newNick, "Обновление очереди на полковые бои");
@@ -110,6 +116,8 @@ async function removeQueueNumber(member: GuildMember | null) {
   delete originalNicknames[member.id];
 }
 
+let lastQueueIds: string[] = [];
+
 client.on("voiceStateUpdate", async (oldState, newState) => {
   const oldChannelId = oldState.channelId;
   const newChannelId = newState.channelId;
@@ -125,6 +133,17 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
             .filter((m) => !m.user.bot)
         : [];
     const currentIds = members.map((m) => m.id);
+
+    // Проверяем, изменился ли состав очереди
+    const changed =
+      currentIds.length !== lastQueueIds.length ||
+      currentIds.some((id, i) => id !== lastQueueIds[i]);
+
+    if (!changed) {
+      // Состав не изменился — не обновляем никнеймы
+      return;
+    }
+
     // Если канал пуст — сбрасываем очередь
     if (members.length === 0) {
       // Если кто-то только что вышел — вернуть ему ник
@@ -162,6 +181,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       await removeQueueNumber(oldState.member);
     }
     await updateQueueNicknames(guild, members);
+    lastQueueIds = [...currentIds];
   }
   // ... существующая логика обновления voiceCounts ...
   for (const channelId of [oldChannelId, newChannelId]) {
