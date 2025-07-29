@@ -6,6 +6,7 @@ import * as path from "path";
 const membersAPath = path.join(__dirname, "..", "data", "members_a.json");
 const membersBPath = path.join(__dirname, "..", "data", "members_b.json");
 const statePath = path.join(__dirname, "..", "data", "members_state.json");
+const leaversTrackingPath = path.join(__dirname, "..", "data", "leavers_tracking.json");
 
 export async function fetchClanPoints(
   clanTag: string
@@ -139,4 +140,26 @@ export function findLeavers(
 ): { nick: string; points: number }[] {
   const currNicks = new Set(curr.map((m) => normalizeNick(m.nick)));
   return prev.filter((m) => !currNicks.has(normalizeNick(m.nick)));
+}
+
+// Новые функции для отслеживания покинувших игроков
+export function loadLeaversTracking(): { nick: string; points: number }[] {
+  if (!fs.existsSync(leaversTrackingPath)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(leaversTrackingPath, "utf-8"));
+  } catch {
+    return [];
+  }
+}
+
+export function saveLeaversTracking(members: { nick: string; points: number }[]) {
+  fs.writeFileSync(leaversTrackingPath, JSON.stringify(members, null, 2));
+}
+
+export function findLeaversFromTracking(
+  currentMembers: { nick: string; points: number }[]
+): { nick: string; points: number }[] {
+  const trackedMembers = loadLeaversTracking();
+  const currNicks = new Set(currentMembers.map((m) => normalizeNick(m.nick)));
+  return trackedMembers.filter((m) => !currNicks.has(normalizeNick(m.nick)));
 }

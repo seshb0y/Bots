@@ -6,6 +6,7 @@ import {
   Message,
   User,
   TextChannel,
+  Guild,
 } from "discord.js";
 import { config } from "dotenv";
 import {
@@ -25,6 +26,9 @@ import {
   fetchClanPoints,
 } from "./utils/clan";
 import { normalize } from "./utils/normalize";
+import { trackFunctionPerformance } from "./commands/resources";
+import * as fs from "fs";
+import * as path from "path";
 
 config();
 
@@ -41,7 +45,7 @@ const client = new Client({
 const voiceCounts = new Map<string, number>();
 
 const QUEUE_NICKNAME_EXCLUDE_IDS = [
-  '319425660580003840', // ID владельца сервера
+  '642764542266310658', // ID владельца сервера
 ];
 // --- Очередь для канала "замена на полковые бои" ---
 const QUEUE_CHANNEL_ID = "821082995188170783";
@@ -67,6 +71,8 @@ function stripEmojiNumber(nick: string): string {
 }
 
 async function updateQueueNicknames(guild: any, members: GuildMember[]) {
+  const startTime = Date.now();
+  
   for (let i = 0; i < queueOrder.length; i++) {
     const userId = queueOrder[i];
     const member = members.find(m => m.id === userId);
@@ -99,6 +105,8 @@ async function updateQueueNicknames(guild: any, members: GuildMember[]) {
     const num = i < emojiNumbers.length ? emojiNumbers[i] : (i + 1).toString();
     console.log(`[QUEUE] ${num} ${orig} (ID: ${member.id})`);
   }
+  
+  trackFunctionPerformance('updateQueueNicknames', startTime);
 }
 
 async function removeQueueNumber(member: GuildMember | null) {
@@ -119,6 +127,8 @@ async function removeQueueNumber(member: GuildMember | null) {
 let lastQueueIds: string[] = [];
 
 client.on("voiceStateUpdate", async (oldState, newState) => {
+  const startTime = Date.now();
+  
   const oldChannelId = oldState.channelId;
   const newChannelId = newState.channelId;
   const guild = oldState.guild || newState.guild;
@@ -141,6 +151,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 
     if (!changed) {
       // Состав не изменился — не обновляем никнеймы
+      trackFunctionPerformance('voiceStateUpdate_skipped', startTime);
       return;
     }
 
@@ -158,6 +169,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       for (const id of Object.keys(originalNicknames))
         delete originalNicknames[id];
       console.log("[QUEUE] Очередь сброшена (канал пуст)");
+      trackFunctionPerformance('voiceStateUpdate_empty', startTime);
       return;
     }
     // Удаляем из очереди тех, кого нет в канале
@@ -206,6 +218,8 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       console.error(`❌ Не удалось обновить канал ${channelId}:`, err);
     }
   }
+  
+  trackFunctionPerformance('voiceStateUpdate', startTime);
 });
 
 function getNextStatsDelayMs() {
@@ -240,7 +254,80 @@ function getNextStatsDelayMs() {
   return minDiff;
 }
 
+const SERVICE_ROLES = [
+  "949669576935874570",
+  "949669770377179196",
+  "949669851440496761",
+];
+const HONOR_ROLE = "1217444648591687700";
+
+const ACHIEVERS_PATH = path.join(__dirname, "..", "data", "season_achievers.json");
+
+function loadAchievers(): Set<string> {
+  if (!fs.existsSync(ACHIEVERS_PATH)) return new Set();
+  try {
+    const arr = JSON.parse(fs.readFileSync(ACHIEVERS_PATH, "utf-8"));
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveAchievers(set: Set<string>) {
+  fs.writeFileSync(ACHIEVERS_PATH, JSON.stringify(Array.from(set), null, 2), "utf-8");
+}
+
+function clearAchievers() {
+  fs.writeFileSync(ACHIEVERS_PATH, "[]", "utf-8");
+}
+
+async function updateAchievers(users: Record<string, UserData>, members: { nick: string; points: number }[]) {
+  const achievers = loadAchievers();
+  // Сопоставим ник -> userId
+  const nickToUserId = new Map<string, string>();
+  for (const [uid, data] of Object.entries(users)) {
+    nickToUserId.set(normalize(data.nick), uid);
+  }
+  for (const m of members) {
+    if (m.points >= 1600) {
+      const userId = nickToUserId.get(normalize(m.nick));
+      if (userId) achievers.add(userId);
+    }
+  }
+  saveAchievers(achievers);
+}
+
+async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserData>) {
+  const achievers = loadAchievers();
+  for (const userId of achievers) {
+    try {
+      const member = await guild.members.fetch(userId);
+      if (!member) continue;
+      // Сколько уже ролей "За безупречную службу"
+      const hasRoles = SERVICE_ROLES.filter(rid => member.roles.cache.has(rid));
+      // Если есть все 3 — снять их и выдать Орден
+      if (hasRoles.length === 3) {
+        await member.roles.remove(SERVICE_ROLES, "Замена на Орден Почётного Воина");
+        await member.roles.add(HONOR_ROLE, "Выдан Орден Почётного Воина за 3 службы");
+        console.log(`[REWARD] ${member.user.tag}: сняты все службы, выдан Орден Почётного Воина`);
+      } else if (hasRoles.length < 3) {
+        // Выдать одну из недостающих ролей
+        const toGive = SERVICE_ROLES.find(rid => !member.roles.cache.has(rid));
+        if (toGive) {
+          await member.roles.add(toGive, "Выдана роль За безупречную службу за 1600+ ЛПР");
+          console.log(`[REWARD] ${member.user.tag}: выдана служба (${toGive})`);
+        }
+      }
+    } catch (e) {
+      console.log(`[REWARD] Не удалось обработать ${userId}:`, e);
+    }
+  }
+  clearAchievers();
+}
+
 async function statsScheduler(client: Client) {
+  const startTime = Date.now();
+  
   // Используем системное время
   const now = new Date();
   const hour = now.getHours();
@@ -253,6 +340,8 @@ async function statsScheduler(client: Client) {
     const members = await fetchClanPoints("ALLIANCE");
     saveMembersAtTime(members, "1650");
     console.log("[STATS] Сохранено состояние участников (1650)");
+    const users = loadJson<Record<string, UserData>>(usersPath);
+    await updateAchievers(users, members);
   } else if (hour === 1 && minute === 20) {
     console.log(
       "[STATS] Сбор состояния участников и отправка статистики (01:20)"
@@ -292,9 +381,19 @@ async function statsScheduler(client: Client) {
     } else {
       console.log("[STATS] Нет изменений для отправки");
     }
+    // Проверка конца сезона: все points = 0
+    if (curr.every(p => p.points === 0)) {
+      const users = loadJson<Record<string, UserData>>(usersPath);
+      const guild = client.guilds.cache.first();
+      if (guild) {
+        await handleSeasonEndRewards(guild, users);
+      }
+    }
   } else {
     console.log("[STATS] Сейчас не время сбора статистики");
   }
+  
+  trackFunctionPerformance('statsScheduler', startTime);
   setTimeout(() => statsScheduler(client), getNextStatsDelayMs());
 }
 
@@ -317,6 +416,7 @@ client.once("ready", async () => {
   }
 
   console.log("✅ Бот готов, голосовые каналы загружены");
+  
   pbNotifyScheduler(client);
   statsScheduler(client);
 });

@@ -4,6 +4,7 @@ export { addtracerCommand } from "./addtracer";
 export { removetracerCommand } from "./removetracer";
 export { listtracedCommand } from "./listtraced";
 export { syncclanCommand } from "./syncclan";
+export { resettleaversCommand } from "./resettleavers";
 export { pbnotifyCommand } from "./pbnotify";
 export { resourcesCommand } from "./resources";
 export { statsCommand } from "./stats";

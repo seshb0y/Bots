@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "ts-node-dev src/index.ts",
     "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "build:prod": "tsc && npm run copy-files",
+    "copy-files": "copy package.json dist\\ && copy .env dist\\ && xcopy data dist\\data\\ /E /I /Y",
+    "start:prod": "node dist/index.js",
     "register": "ts-node src/register-commands.ts"
   },
   "keywords": [],
@@ -20,7 +24,7 @@
     "pidusage": "^4.0.1"
   },
   "devDependencies": {
-    "@types/node": "^24.0.1",
+    "@types/node": "^24.0.0",
     "@types/pidusage": "^2.0.5",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",

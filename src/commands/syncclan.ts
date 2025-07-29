@@ -7,6 +7,9 @@ import {
   saveMembersAlternating,
   loadPrevAndCurrMembers,
   findLeavers,
+  loadLeaversTracking,
+  saveLeaversTracking,
+  findLeaversFromTracking,
 } from "../utils/clan";
 import { normalize } from "../utils/normalize";
 
@@ -21,16 +24,24 @@ export async function syncclanCommand(
   const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
   const members = await fetchClanPoints(clanTag);
 
-  // 1. Загрузить prev и curr до сохранения новых данных
-  const [prevMembers, currMembers] = loadPrevAndCurrMembers();
-
-  // Логирование для отладки
-  console.log('[SYNC] prevMembers:', prevMembers.map(m => m.nick));
-  console.log('[SYNC] currMembers:', currMembers.map(m => m.nick));
-
-  // 2. Сравнить
-  const leavers = findLeavers(prevMembers, currMembers);
+  // 1. Загрузить отслеживаемых участников и найти покинувших
+  const trackedMembers = loadLeaversTracking();
+  
+  // Если файл отслеживания пустой, инициализируем его текущими участниками
+  if (trackedMembers.length === 0) {
+    console.log('[SYNC] Инициализация файла отслеживания покинувших игроков');
+    saveLeaversTracking(members);
+    await interaction.editReply(
+      `✅ Файл отслеживания инициализирован с ${members.length} участниками клана ${clanTag}.`
+    );
+    return;
+  }
+  
+  const leavers = findLeaversFromTracking(members);
+  console.log('[SYNC] trackedMembers:', trackedMembers.map(m => m.nick));
+  console.log('[SYNC] currentMembers:', members.map(m => m.nick));
   console.log('[SYNC] leavers:', leavers.map(m => m.nick));
+  
   if (leavers.length > 0) {
     const channel = await interaction.client.channels.fetch(LEAVE_CHANNEL_ID);
     const date = new Date().toLocaleDateString("ru-RU");
@@ -42,7 +53,10 @@ export async function syncclanCommand(
     }
   }
 
-  // 3. Сохранить новые данные в следующий файл
+  // 2. Обновить файл отслеживания текущими участниками
+  saveLeaversTracking(members);
+
+  // 3. Сохранить новые данные в следующий файл (для статистики)
   saveMembersAlternating(members);
 
   let count = 0;

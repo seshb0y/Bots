@@ -40,11 +40,24 @@ const commands = [
         .setRequired(true)
     ),
   new SlashCommandBuilder()
+    .setName("resettleavers")
+    .setDescription("Сбросить файл отслеживания покинувших игроков"),
+  new SlashCommandBuilder()
     .setName("pbnotify")
     .setDescription("Manually send PB notification to officers"),
   new SlashCommandBuilder()
     .setName("resources")
-    .setDescription("Show current CPU and memory usage of the bot"),
+    .setDescription("Show current CPU and memory usage of the bot")
+    .addStringOption((option) =>
+      option
+        .setName("option")
+        .setDescription("Выберите режим")
+        .setRequired(false)
+        .addChoices(
+          { name: "current", value: "current" },
+          { name: "history", value: "history" }
+        )
+    ),
   new SlashCommandBuilder()
     .setName("checktracked")
     .setDescription(
