@@ -12,6 +12,7 @@ import {
   findLeaversFromTracking,
 } from "../utils/clan";
 import { normalize } from "../utils/normalize";
+import { logSyncclan, info } from "../utils/logger";
 
 const LEAVE_CHANNEL_ID = "882263905009807390";
 
@@ -20,6 +21,12 @@ export async function syncclanCommand(
 ) {
   await interaction.deferReply({ ephemeral: true });
   const clanTag = interaction.options.getString("clan", true);
+  
+  logSyncclan(`Запуск синхронизации клана ${clanTag}`, { 
+    userId: interaction.user.id, 
+    username: interaction.user.tag 
+  });
+  
   const users = loadJson<Record<string, UserData>>(usersPath);
   const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
   const members = await fetchClanPoints(clanTag);
@@ -29,8 +36,9 @@ export async function syncclanCommand(
   
   // Если файл отслеживания пустой, инициализируем его текущими участниками
   if (trackedMembers.length === 0) {
-    console.log('[SYNC] Инициализация файла отслеживания покинувших игроков');
+    logSyncclan("Инициализация файла отслеживания покинувших игроков");
     saveLeaversTracking(members);
+    logSyncclan(`Файл отслеживания инициализирован с ${members.length} участниками клана ${clanTag}`);
     await interaction.editReply(
       `✅ Файл отслеживания инициализирован с ${members.length} участниками клана ${clanTag}.`
     );
@@ -38,9 +46,9 @@ export async function syncclanCommand(
   }
   
   const leavers = findLeaversFromTracking(members);
-  console.log('[SYNC] trackedMembers:', trackedMembers.map(m => m.nick));
-  console.log('[SYNC] currentMembers:', members.map(m => m.nick));
-  console.log('[SYNC] leavers:', leavers.map(m => m.nick));
+  logSyncclan(`trackedMembers: ${trackedMembers.map(m => m.nick)}`);
+  logSyncclan(`currentMembers: ${members.map(m => m.nick)}`);
+  logSyncclan(`leavers: ${leavers.map(m => m.nick)}`);
   
   if (leavers.length > 0) {
     const channel = await interaction.client.channels.fetch(LEAVE_CHANNEL_ID);
@@ -51,6 +59,7 @@ export async function syncclanCommand(
         await (channel as TextChannel).send(msg);
       }
     }
+    logSyncclan(`Отправлено уведомлений о покинувших: ${leavers.length}`);
   }
 
   // 2. Обновить файл отслеживания текущими участниками
@@ -79,6 +88,8 @@ export async function syncclanCommand(
 
   saveJson(usersPath, users);
   saveJson(trackedPath, tracked);
+
+  logSyncclan(`Синхронизировано ${count} участников по клану ${clanTag}`);
 
   await interaction.editReply(
     `✅ Синхронизировано ${count} участников по клану ${clanTag}.`

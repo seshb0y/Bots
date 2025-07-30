@@ -18,15 +18,30 @@ import {
   STATS_CHANNEL_ID,
 } from "./constants";
 import { loadJson, saveJson } from "./utils/json";
-import { UserData } from "./types";
-import { pbNotifyScheduler } from "./utils/pbNotify";
+import { UserData, TrackedPlayer } from "./types";
+import { pbNotifyScheduler, autoPbAnnounceScheduler } from "./utils/pbNotify";
 import {
   saveMembersAtTime,
   loadMembersAtTime,
   fetchClanPoints,
+  loadLeaversTracking,
+  saveLeaversTracking,
+  findLeaversFromTracking,
+  saveMembersAlternating,
 } from "./utils/clan";
 import { normalize } from "./utils/normalize";
 import { trackFunctionPerformance } from "./commands/resources";
+import { 
+  info, 
+  warn, 
+  error, 
+  logVoiceState, 
+  logStats, 
+  logSyncclan, 
+  logQueue, 
+  logReward,
+  cleanupOldLogs 
+} from "./utils/logger";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -83,27 +98,27 @@ async function updateQueueNicknames(guild: any, members: GuildMember[]) {
     const newNick = `${num} ${orig}`;
     if (QUEUE_NICKNAME_EXCLUDE_IDS.includes(userId)) {
       // Не меняем ник, но логируем
-      console.log(`[QUEUE] (Исключение) Не меняем ник для ${orig} (ID: ${userId}), но учитываем в очереди как номер ${num}`);
+      logQueue(`(Исключение) Не меняем ник для ${orig} (ID: ${userId}), но учитываем в очереди как номер ${num}`);
       continue;
     }
     if (member.nickname !== newNick) {
       try {
         await member.setNickname(newNick, "Обновление очереди на полковые бои");
       } catch (e) {
-        console.log(`[QUEUE] Не удалось изменить ник ${orig}:`, e);
+        logQueue(`Не удалось изменить ник ${orig}`, e);
       }
     }
-    console.log(`[QUEUE] ${num} ${orig} (ID: ${member.id})`);
+    logQueue(`${num} ${orig} (ID: ${member.id})`);
   }
   // Итоговый порядок очереди
-  console.log("[QUEUE] Итоговый порядок очереди:");
+  logQueue("Итоговый порядок очереди:");
   for (let i = 0; i < queueOrder.length; i++) {
     const userId = queueOrder[i];
     const member = members.find((m) => m.id === userId);
     if (!member) continue;
     const orig = originalNicknames[userId];
     const num = i < emojiNumbers.length ? emojiNumbers[i] : (i + 1).toString();
-    console.log(`[QUEUE] ${num} ${orig} (ID: ${member.id})`);
+    logQueue(`${num} ${orig} (ID: ${member.id})`);
   }
   
   trackFunctionPerformance('updateQueueNicknames', startTime);
@@ -118,7 +133,7 @@ async function removeQueueNumber(member: GuildMember | null) {
     try {
       await member.setNickname(orig, "Выход из очереди на полковые бои");
     } catch (e) {
-      console.log(`[QUEUE] Не удалось вернуть ник ${orig}:`, e);
+      logQueue(`Не удалось вернуть ник ${orig}`, e);
     }
   }
   delete originalNicknames[member.id];
@@ -168,7 +183,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       queueOrder = [];
       for (const id of Object.keys(originalNicknames))
         delete originalNicknames[id];
-      console.log("[QUEUE] Очередь сброшена (канал пуст)");
+      logQueue("Очередь сброшена (канал пуст)");
       trackFunctionPerformance('voiceStateUpdate_empty', startTime);
       return;
     }
@@ -207,15 +222,11 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
         const prev = voiceCounts.get(channelId);
         voiceCounts.set(channelId, realCount);
         if (prev !== realCount) {
-          console.log(
-            `🔄 Канал "${channel.name}" обновлён: было ${
-              prev ?? "?"
-            }, стало ${realCount}`
-          );
+          logVoiceState(`Канал "${channel.name}" обновлён: было ${prev ?? "?"}, стало ${realCount}`);
         }
       }
     } catch (err) {
-      console.error(`❌ Не удалось обновить канал ${channelId}:`, err);
+      error(`Не удалось обновить канал ${channelId}`, err);
     }
   }
   
@@ -244,13 +255,7 @@ function getNextStatsDelayMs() {
       next = target;
     }
   }
-  console.log(
-    `[STATS] Сейчас (сервер): ${now.toLocaleTimeString(
-      "ru-RU"
-    )}, следующий запуск через ${Math.round(
-      minDiff / 1000
-    )} сек (${next?.toLocaleTimeString("ru-RU")})`
-  );
+  logStats(`Сейчас (сервер): ${now.toLocaleTimeString("ru-RU")}, следующий запуск через ${Math.round(minDiff / 1000)} сек (${next?.toLocaleTimeString("ru-RU")})`);
   return minDiff;
 }
 
@@ -295,10 +300,13 @@ async function updateAchievers(users: Record<string, UserData>, members: { nick:
     }
   }
   saveAchievers(achievers);
+  logStats(`Обновлены достижения: ${achievers.size} игроков с 1600+ ЛПР`);
 }
 
 async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserData>) {
   const achievers = loadAchievers();
+  logReward(`Начало выдачи наград за сезон. Достигших 1600+ ЛПР: ${achievers.size}`);
+  
   for (const userId of achievers) {
     try {
       const member = await guild.members.fetch(userId);
@@ -309,20 +317,21 @@ async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserDa
       if (hasRoles.length === 3) {
         await member.roles.remove(SERVICE_ROLES, "Замена на Орден Почётного Воина");
         await member.roles.add(HONOR_ROLE, "Выдан Орден Почётного Воина за 3 службы");
-        console.log(`[REWARD] ${member.user.tag}: сняты все службы, выдан Орден Почётного Воина`);
+        logReward(`${member.user.tag}: сняты все службы, выдан Орден Почётного Воина`);
       } else if (hasRoles.length < 3) {
         // Выдать одну из недостающих ролей
         const toGive = SERVICE_ROLES.find(rid => !member.roles.cache.has(rid));
         if (toGive) {
           await member.roles.add(toGive, "Выдана роль За безупречную службу за 1600+ ЛПР");
-          console.log(`[REWARD] ${member.user.tag}: выдана служба (${toGive})`);
+          logReward(`${member.user.tag}: выдана служба (${toGive})`);
         }
       }
     } catch (e) {
-      console.log(`[REWARD] Не удалось обработать ${userId}:`, e);
+      logReward(`Не удалось обработать ${userId}`, e);
     }
   }
   clearAchievers();
+  logReward("Награды за сезон выданы, файл достижений очищен");
 }
 
 async function statsScheduler(client: Client) {
@@ -332,23 +341,20 @@ async function statsScheduler(client: Client) {
   const now = new Date();
   const hour = now.getHours();
   const minute = now.getMinutes();
-  console.log(
-    `[STATS] Проверка времени: ${hour}:${minute < 10 ? "0" + minute : minute}`
-  );
+  logStats(`Проверка времени: ${hour}:${minute < 10 ? "0" + minute : minute}`);
+  
   if (hour === 16 && minute === 50) {
-    console.log("[STATS] Сбор состояния участников (16:50)");
+    logStats("Сбор состояния участников (16:50)");
     const members = await fetchClanPoints("ALLIANCE");
     saveMembersAtTime(members, "1650");
-    console.log("[STATS] Сохранено состояние участников (1650)");
+    logStats("Сохранено состояние участников (1650)");
     const users = loadJson<Record<string, UserData>>(usersPath);
     await updateAchievers(users, members);
   } else if (hour === 1 && minute === 20) {
-    console.log(
-      "[STATS] Сбор состояния участников и отправка статистики (01:20)"
-    );
+    logStats("Сбор состояния участников и отправка статистики (01:20)");
     const members = await fetchClanPoints("ALLIANCE");
     saveMembersAtTime(members, "0120");
-    console.log("[STATS] Сохранено состояние участников (0120)");
+    logStats("Сохранено состояние участников (0120)");
     // Сравнить и отправить статистику
     const prev = loadMembersAtTime("1650");
     const curr = loadMembersAtTime("0120");
@@ -376,13 +382,14 @@ async function statsScheduler(client: Client) {
       const channel = await client.channels.fetch(STATS_CHANNEL_ID);
       if (channel && channel.isTextBased()) {
         await (channel as TextChannel).send(msg);
-        console.log("[STATS] Статистика отправлена в канал");
+        logStats("Статистика отправлена в канал");
       }
     } else {
-      console.log("[STATS] Нет изменений для отправки");
+      logStats("Нет изменений для отправки");
     }
     // Проверка конца сезона: все points = 0
     if (curr.every(p => p.points === 0)) {
+      logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
       const users = loadJson<Record<string, UserData>>(usersPath);
       const guild = client.guilds.cache.first();
       if (guild) {
@@ -390,16 +397,125 @@ async function statsScheduler(client: Client) {
       }
     }
   } else {
-    console.log("[STATS] Сейчас не время сбора статистики");
+    logStats("Сейчас не время сбора статистики");
   }
   
   trackFunctionPerformance('statsScheduler', startTime);
   setTimeout(() => statsScheduler(client), getNextStatsDelayMs());
 }
 
+function getNextSyncclanDelayMs() {
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const second = now.getSeconds();
+  
+  // Целевое время: 12:00
+  const targetHour = 12;
+  const targetMinute = 0;
+  
+  let target = new Date(now);
+  target.setHours(targetHour, targetMinute, 0, 0);
+  
+  // Если сегодня 12:00 уже прошло, ждем до завтра
+  if (target <= now) {
+    target.setDate(target.getDate() + 1);
+  }
+  
+  const diff = target.getTime() - now.getTime();
+  logSyncclan(`Сейчас: ${now.toLocaleTimeString("ru-RU")}, следующий запуск через ${Math.round(diff / 1000)} сек (${target.toLocaleTimeString("ru-RU")})`);
+  return diff;
+}
+
+async function syncclanScheduler(client: Client) {
+  const startTime = Date.now();
+  
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  
+  logSyncclan(`Проверка времени: ${hour}:${minute < 10 ? "0" + minute : minute}`);
+  
+  if (hour === 12 && minute === 0) {
+    logSyncclan("Автоматический запуск синхронизации клана ALLIANCE");
+    
+    try {
+      // Имитируем выполнение команды syncclan ALLIANCE
+      const users = loadJson<Record<string, UserData>>(usersPath);
+      const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
+      const members = await fetchClanPoints("ALLIANCE");
+
+      // 1. Загрузить отслеживаемых участников и найти покинувших
+      const trackedMembers = loadLeaversTracking();
+      
+      // Если файл отслеживания пустой, инициализируем его текущими участниками
+      if (trackedMembers.length === 0) {
+        logSyncclan("Инициализация файла отслеживания покинувших игроков");
+        saveLeaversTracking(members);
+        logSyncclan(`Файл отслеживания инициализирован с ${members.length} участниками клана ALLIANCE`);
+      } else {
+        const leavers = findLeaversFromTracking(members);
+        logSyncclan(`trackedMembers: ${trackedMembers.map(m => m.nick)}`);
+        logSyncclan(`currentMembers: ${members.map(m => m.nick)}`);
+        logSyncclan(`leavers: ${leavers.map(m => m.nick)}`);
+        
+        if (leavers.length > 0) {
+          const channel = await client.channels.fetch("882263905009807390");
+          const date = new Date().toLocaleDateString("ru-RU");
+          for (const leaver of leavers) {
+            const msg = `${leaver.nick} покинул полк ${date} с ${leaver.points} лпр`;
+            if (channel && channel.isTextBased()) {
+              await (channel as TextChannel).send(msg);
+            }
+          }
+          logSyncclan(`Отправлено уведомлений о покинувших: ${leavers.length}`);
+        }
+
+        // 2. Обновить файл отслеживания текущими участниками
+        saveLeaversTracking(members);
+      }
+
+      // 3. Сохранить новые данные в следующий файл (для статистики)
+      saveMembersAlternating(members);
+
+      let count = 0;
+      for (const m of members) {
+        const uid = Object.keys(users).find(
+          (id) => normalize(users[id].nick ?? "") === normalize(m.nick)
+        );
+        if (uid) {
+          users[uid].points = m.points;
+          count++;
+        }
+        const trackedKey = Object.keys(tracked).find(
+          (t) => normalize(t) === normalize(m.nick)
+        );
+        if (trackedKey) {
+          tracked[trackedKey].lastPoints = m.points;
+          count++;
+        }
+      }
+
+      saveJson(usersPath, users);
+      saveJson(trackedPath, tracked);
+
+      logSyncclan(`Синхронизировано ${count} участников по клану ALLIANCE`);
+    } catch (error: any) {
+      error("Ошибка при автоматической синхронизации", error);
+    }
+  } else {
+    logSyncclan("Сейчас не время синхронизации клана");
+  }
+  
+  trackFunctionPerformance('syncclanScheduler', startTime);
+  setTimeout(() => syncclanScheduler(client), getNextSyncclanDelayMs());
+}
+
 client.once("ready", async () => {
   const guild = client.guilds.cache.first();
   if (!guild) return;
+
+  info(`Бот запущен. Пользователь: ${client.user?.tag}`);
 
   for (const channelId of VOICE_CHANNEL_IDS) {
     const channel = await guild.channels.fetch(channelId);
@@ -409,16 +525,19 @@ client.once("ready", async () => {
       ).length;
       voiceCounts.set(channelId, realCount);
 
-      console.log(
-        `🔹 Канал "${channel.name}" загружен: ${realCount} человек(а)`
-      );
+      logVoiceState(`Канал "${channel.name}" загружен: ${realCount} человек(а)`);
     }
   }
 
-  console.log("✅ Бот готов, голосовые каналы загружены");
+  info("Бот готов, голосовые каналы загружены");
+  
+  // Очистка старых логов при запуске
+  cleanupOldLogs();
   
   pbNotifyScheduler(client);
+  autoPbAnnounceScheduler(client);
   statsScheduler(client);
+  syncclanScheduler(client);
 });
 
 client.on("guildMemberAdd", (member: GuildMember) => {
@@ -432,15 +551,16 @@ client.on("guildMemberAdd", (member: GuildMember) => {
       nick: member.user.username,
     };
     saveJson(usersPath, users);
-    console.log(`✅ Зарегистрирован новый участник: ${member.user.tag}`);
+    info(`Зарегистрирован новый участник: ${member.user.tag}`);
   }
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-  console.error("Необработанное отклонение промиса:", reason);
+  error("Необработанное отклонение промиса", { reason, promise });
 });
+
 process.on("uncaughtException", (err) => {
-  console.error("Необработанное исключение:", err);
+  error("Необработанное исключение", err);
 });
 
 export { client, voiceCounts };
