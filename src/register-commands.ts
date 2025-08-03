@@ -66,6 +66,9 @@ const commands = [
   new SlashCommandBuilder()
     .setName("stats")
     .setDescription("Показать статистику изменений очков за сутки по игрокам"),
+  new SlashCommandBuilder()
+    .setName("teststats")
+    .setDescription("Тестовая команда для проверки статистики с лидербордом"),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

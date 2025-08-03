@@ -128,22 +128,39 @@ export async function autoPbAnnounceScheduler(client: Client) {
       "885928590720524328",
       "821082995188170783"
     ];
-    let count = 0;
+    
+    // Проверяем количество людей в каждом канале отдельно
+    let totalCount = 0;
+    let mainChannelCount = 0; // Количество людей в канале 763085196118851608
+    
     for (const id of channelIds) {
       const channel = await guild?.channels.fetch(id);
       if (channel?.isVoiceBased()) {
-        count += Array.from(channel.members.values()).filter(m => !m.user.bot).length;
+        const channelCount = Array.from(channel.members.values()).filter(m => !m.user.bot).length;
+        totalCount += channelCount;
+        
+        // Отдельно считаем людей в основном канале
+        if (id === "763085196118851608") {
+          mainChannelCount = channelCount;
+        }
       }
     }
-    const plus = Math.max(0, 8 - count);
-    if (count < 8) { // Condition: only send if less than 8 people
+    
+    const plus = Math.max(0, 8 - totalCount);
+    
+    // Отправляем объявление только если в основном канале есть люди И общее количество меньше 8
+    if (mainChannelCount > 0 && totalCount < 8) {
       const announceChannel = await client.channels.fetch("763085196118851607");
       if (announceChannel && announceChannel.isTextBased()) {
         await (announceChannel as TextChannel).send(`@everyone +${plus}`);
-        logPbNotify(`Автоматическое объявление ПБ: +${plus} (всего в каналах: ${count})`);
+        logPbNotify(`Автоматическое объявление ПБ: +${plus} (всего в каналах: ${totalCount}, в основном канале: ${mainChannelCount})`);
       }
     } else {
-      logPbNotify(`Автоматическое объявление ПБ пропущено (достаточно людей: ${count})`);
+      if (mainChannelCount === 0) {
+        logPbNotify(`Автоматическое объявление ПБ пропущено (в основном канале нет людей: ${mainChannelCount})`);
+      } else {
+        logPbNotify(`Автоматическое объявление ПБ пропущено (достаточно людей: ${totalCount})`);
+      }
     }
   }
   setTimeout(() => autoPbAnnounceScheduler(client), 20 * 60 * 1000);

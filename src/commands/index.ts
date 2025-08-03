@@ -8,6 +8,7 @@ import { pbnotifyCommand } from "./pbnotify";
 import { resourcesCommand } from "./resources";
 import { syncclanCommand } from "./syncclan";
 import { resettleaversCommand } from "./resettleavers";
+import { teststatsCommand } from "./teststats";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error } from "../utils/logger";
 
@@ -21,6 +22,7 @@ export {
   resourcesCommand,
   syncclanCommand,
   resettleaversCommand,
+  teststatsCommand,
 };
 
 export function setupCommands(client: Client) {
@@ -37,14 +39,35 @@ export function setupCommands(client: Client) {
             "885928590720524328",
             "821082995188170783"
           ];
-          let count = 0;
+          
+          // Проверяем количество людей в каждом канале отдельно
+          let totalCount = 0;
+          let mainChannelCount = 0; // Количество людей в канале 763085196118851608
+          
           for (const id of channelIds) {
             const channel = await guild?.channels.fetch(id);
             if (channel?.isVoiceBased()) {
-              count += Array.from(channel.members.values()).filter(m => !m.user.bot).length;
+              const channelCount = Array.from(channel.members.values()).filter(m => !m.user.bot).length;
+              totalCount += channelCount;
+              
+              // Отдельно считаем людей в основном канале
+              if (id === "763085196118851608") {
+                mainChannelCount = channelCount;
+              }
             }
           }
-          const plus = Math.max(0, 8 - count);
+          
+          const plus = Math.max(0, 8 - totalCount);
+          
+          // Проверяем, есть ли люди в основном канале
+          if (mainChannelCount === 0) {
+            await interaction.reply({ 
+              content: "❌ В основном канале нет людей! Сначала зайдите в канал для ПБ.", 
+              ephemeral: true 
+            });
+            return;
+          }
+          
           const announceChannel = await client.channels.fetch("763085196118851607");
           if (announceChannel && announceChannel.isTextBased()) {
             const now = new Date();
@@ -115,6 +138,9 @@ export function setupCommands(client: Client) {
             break;
           case "resettleavers":
             await resettleaversCommand(interaction);
+            break;
+          case "teststats":
+            await teststatsCommand(interaction);
             break;
           default:
             logCommand(`Неизвестная команда: ${commandName}`, { 

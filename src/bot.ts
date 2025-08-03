@@ -29,6 +29,12 @@ import {
   findLeaversFromTracking,
   saveMembersAlternating,
 } from "./utils/clan";
+import {
+  fetchClanLeaderboardInfo,
+  saveLeaderboardData,
+  loadLeaderboardData,
+  compareLeaderboardData,
+} from "./utils/leaderboard";
 import { normalize } from "./utils/normalize";
 import { trackFunctionPerformance } from "./commands/resources";
 import { 
@@ -348,6 +354,22 @@ async function statsScheduler(client: Client) {
     const members = await fetchClanPoints("ALLIANCE");
     saveMembersAtTime(members, "1650");
     logStats("Сохранено состояние участников (1650)");
+    
+    // Получаем информацию о месте полка в лидерборде
+    logStats("Получение информации о месте полка в лидерборде...");
+    const leaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+    if (leaderboardInfo) {
+      const today = new Date().toISOString().slice(0, 10);
+      saveLeaderboardData({
+        date: today,
+        position: leaderboardInfo.position,
+        points: leaderboardInfo.points
+      });
+      logStats(`Сохранена информация о лидерборде: место ${leaderboardInfo.position}, очки ${leaderboardInfo.points}`);
+    } else {
+      logStats("Не удалось получить информацию о лидерборде");
+    }
+    
     const users = loadJson<Record<string, UserData>>(usersPath);
     await updateAchievers(users, members);
   } else if (hour === 1 && minute === 20) {
@@ -355,6 +377,12 @@ async function statsScheduler(client: Client) {
     const members = await fetchClanPoints("ALLIANCE");
     saveMembersAtTime(members, "0120");
     logStats("Сохранено состояние участников (0120)");
+    
+    // Получаем текущую информацию о лидерборде
+    logStats("Получение текущей информации о лидерборде...");
+    const currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+    const previousLeaderboardData = loadLeaderboardData();
+    
     // Сравнить и отправить статистику
     const prev = loadMembersAtTime("1650");
     const curr = loadMembersAtTime("0120");
@@ -372,21 +400,56 @@ async function statsScheduler(client: Client) {
         }
       }
     }
+    
+    let msg = `\uD83D\uDCCA **Статистика за сутки:**\n`;
+    
+    // Добавляем информацию о лидерборде
+    if (currentLeaderboardInfo && previousLeaderboardData) {
+      const comparison = compareLeaderboardData(currentLeaderboardInfo, previousLeaderboardData);
+      
+      msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+      
+      if (comparison.positionDirection === "up") {
+        msg += `📈 Поднялись на ${comparison.positionChange} мест\n`;
+      } else if (comparison.positionDirection === "down") {
+        msg += `📉 Опустились на ${comparison.positionChange} мест\n`;
+      } else {
+        msg += `➡️ Место не изменилось\n`;
+      }
+      
+      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points}\n`;
+      
+      if (comparison.pointsDirection === "up") {
+        msg += `📈 Получили ${comparison.pointsChange} очков\n`;
+      } else if (comparison.pointsDirection === "down") {
+        msg += `📉 Потеряли ${comparison.pointsChange} очков\n`;
+      } else {
+        msg += `➡️ Очки не изменились\n`;
+      }
+      
+      msg += `\n`;
+    } else if (currentLeaderboardInfo) {
+      msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points}\n\n`;
+    }
+    
+    msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;
+    
     if (changes.length > 0) {
-      let msg = `\uD83D\uDCCA **Статистика за сутки:**\n`;
-      msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;
       msg += `\nИзменения по игрокам:\n`;
       for (const { nick, delta } of changes.sort((a, b) => b.delta - a.delta)) {
         msg += `• ${nick}: ${delta >= 0 ? "+" : ""}${delta}\n`;
       }
-      const channel = await client.channels.fetch(STATS_CHANNEL_ID);
-      if (channel && channel.isTextBased()) {
-        await (channel as TextChannel).send(msg);
-        logStats("Статистика отправлена в канал");
-      }
     } else {
-      logStats("Нет изменений для отправки");
+      msg += `\nЗа сутки не было изменений очков ни у одного игрока.\n`;
     }
+    
+    const channel = await client.channels.fetch(STATS_CHANNEL_ID);
+    if (channel && channel.isTextBased()) {
+      await (channel as TextChannel).send(msg);
+      logStats("Статистика отправлена в канал");
+    }
+    
     // Проверка конца сезона: все points = 0
     if (curr.every(p => p.points === 0)) {
       logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
