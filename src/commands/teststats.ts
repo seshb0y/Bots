@@ -2,16 +2,43 @@ import { ChatInputCommandInteraction, TextChannel } from "discord.js";
 import { STATS_CHANNEL_ID } from "../constants";
 import { loadPrevAndCurrMembers } from "../utils/clan";
 import { normalize } from "../utils/normalize";
-import { fetchClanLeaderboardInfo, loadLeaderboardData, compareLeaderboardData } from "../utils/leaderboard";
+
+console.log("🔍 Загружаю модули в teststats...");
+let fetchClanLeaderboardInfo: any, loadLeaderboardData: any, compareLeaderboardData: any;
+
+try {
+  const leaderboardModule = require("../utils/leaderboard");
+  fetchClanLeaderboardInfo = leaderboardModule.fetchClanLeaderboardInfo;
+  loadLeaderboardData = leaderboardModule.loadLeaderboardData;
+  compareLeaderboardData = leaderboardModule.compareLeaderboardData;
+  console.log("🔍 Модули leaderboard загружены успешно");
+} catch (error) {
+  console.error("❌ Ошибка при загрузке модулей leaderboard:", error);
+}
 
 export async function teststatsCommand(interaction: ChatInputCommandInteraction) {
+  console.log("🔍 Команда teststats вызвана");
   await interaction.deferReply({ ephemeral: true });
+  console.log("🔍 deferReply выполнен");
   
   try {
+    console.log("🔍 Начинаю выполнение команды teststats");
+    
     // Получаем информацию о лидерборде
     await interaction.editReply("🔍 Получаю информацию о лидерборде...");
-    const currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+    let currentLeaderboardInfo = null;
+    try {
+      console.log("🔍 Вызываю fetchClanLeaderboardInfo...");
+      currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+      console.log("🔍 fetchClanLeaderboardInfo завершен:", currentLeaderboardInfo);
+    } catch (error) {
+      console.error("Ошибка при получении информации о лидерборде:", error);
+      await interaction.editReply("⚠️ Ошибка при получении информации о лидерборде. Продолжаю без этих данных...");
+    }
+    
+    console.log("🔍 Загружаю предыдущие данные лидерборда...");
     const previousLeaderboardData = loadLeaderboardData();
+    console.log("🔍 Предыдущие данные:", previousLeaderboardData);
     
     await interaction.editReply("📊 Анализирую данные участников...");
     const [prev, curr] = loadPrevAndCurrMembers();

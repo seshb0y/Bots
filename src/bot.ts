@@ -380,7 +380,17 @@ async function statsScheduler(client: Client) {
     
     // Получаем текущую информацию о лидерборде
     logStats("Получение текущей информации о лидерборде...");
-    const currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+    let currentLeaderboardInfo = null;
+    try {
+      currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+      if (currentLeaderboardInfo) {
+        logStats(`Получена информация о лидерборде: место ${currentLeaderboardInfo.position}, очки ${currentLeaderboardInfo.points}`);
+      } else {
+        logStats("Полк ALLIANCE не найден в лидерборде");
+      }
+    } catch (error) {
+      logStats(`Ошибка при получении информации о лидерборде: ${error}`);
+    }
     const previousLeaderboardData = loadLeaderboardData();
     
     // Сравнить и отправить статистику
@@ -417,12 +427,12 @@ async function statsScheduler(client: Client) {
         msg += `➡️ Место не изменилось\n`;
       }
       
-      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points}\n`;
+      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n`;
       
       if (comparison.pointsDirection === "up") {
-        msg += `📈 Получили ${comparison.pointsChange} очков\n`;
+        msg += `📈 Получили ${comparison.pointsChange.toLocaleString()} очков\n`;
       } else if (comparison.pointsDirection === "down") {
-        msg += `📉 Потеряли ${comparison.pointsChange} очков\n`;
+        msg += `📉 Потеряли ${comparison.pointsChange.toLocaleString()} очков\n`;
       } else {
         msg += `➡️ Очки не изменились\n`;
       }
@@ -430,7 +440,7 @@ async function statsScheduler(client: Client) {
       msg += `\n`;
     } else if (currentLeaderboardInfo) {
       msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
-      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points}\n\n`;
+      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n\n`;
     }
     
     msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;

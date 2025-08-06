@@ -69,6 +69,9 @@ const commands = [
   new SlashCommandBuilder()
     .setName("teststats")
     .setDescription("Тестовая команда для проверки статистики с лидербордом"),
+  new SlashCommandBuilder()
+    .setName("simpletest")
+    .setDescription("Простая тестовая команда"),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

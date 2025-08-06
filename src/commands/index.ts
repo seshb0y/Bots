@@ -9,6 +9,7 @@ import { resourcesCommand } from "./resources";
 import { syncclanCommand } from "./syncclan";
 import { resettleaversCommand } from "./resettleavers";
 import { teststatsCommand } from "./teststats";
+import { simpleTestCommand } from "./simple-test";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error } from "../utils/logger";
 
@@ -141,6 +142,12 @@ export function setupCommands(client: Client) {
             break;
           case "teststats":
             await teststatsCommand(interaction);
+            break;
+          case "ping":
+            await interaction.reply({ content: "🏓 Понг! Бот работает.", ephemeral: true });
+            break;
+          case "simpletest":
+            await simpleTestCommand(interaction);
             break;
           default:
             logCommand(`Неизвестная команда: ${commandName}`, { 

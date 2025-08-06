@@ -51,8 +51,21 @@ export async function fetchClanLeaderboardInfo(clanName: string): Promise<ClanLe
         
         const $ = cheerio.load(html);
         
+        // Отладочная информация о структуре HTML
+        console.log(`📄 Длина HTML: ${html.length}`);
+        console.log(`🔍 Количество таблиц: ${$("table").length}`);
+        console.log(`🔍 Количество строк tr: ${$("tr").length}`);
+        
+        // Сохраняем HTML для отладки (только для первой страницы)
+        if (page === 3) {
+          fs.writeFileSync('debug_page.html', html);
+          console.log('💾 HTML сохранен в debug_page.html');
+        }
+        
         // Ищем строки в таблице лидерборда
         const rows = $("table tbody tr");
+        
+        console.log(`🔍 Найдено ${rows.length} строк в таблице на странице ${page}`);
         
         for (let i = 0; i < rows.length; i++) {
           const row = $(rows[i]);
@@ -64,8 +77,13 @@ export async function fetchClanLeaderboardInfo(clanName: string): Promise<ClanLe
             const clanLink = $(cells[1]).find("a").text().trim(); // Ищем ссылку с названием клана
             const pointsCell = $(cells[2]).text().trim();
             
-            // Проверяем, содержит ли название полка искомый клан
-            if (clanLink.includes(clanName)) {
+            console.log(`📋 Строка ${i + 1}: позиция="${positionCell}", клан="${clanLink}", очки="${pointsCell}"`);
+            
+            // Проверяем, содержит ли название полка искомый клан (разные варианты написания)
+            const normalizedClanLink = clanLink.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normalizedClanName = clanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            
+            if (clanLink.includes(clanName) || normalizedClanLink.includes(normalizedClanName)) {
               // Извлекаем позицию из текста
               const positionMatch = positionCell.match(/(\d+)/);
               const position = positionMatch ? parseInt(positionMatch[1], 10) : 0;
