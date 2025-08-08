@@ -12,16 +12,17 @@ let pbAnnounceDate = "";
 
 function getNextPbNotifyDelayMs() {
   const now = new Date();
-  const hour = now.getHours();
+  const mskHour = now.getUTCHours() + 3;
   const minute = now.getMinutes();
   const second = now.getSeconds();
   
-  // Целевое время: 17:00
+  // Целевое время: 17:00 (московское время)
   const targetHour = 17;
   const targetMinute = 0;
   
   let target = new Date(now);
-  target.setHours(targetHour, targetMinute, 0, 0);
+  // Устанавливаем московское время
+  target.setUTCHours(targetHour - 3, targetMinute, 0, 0);
   
   // Если сегодня 17:00 уже прошло, ждем до завтра
   if (target <= now) {
@@ -29,24 +30,21 @@ function getNextPbNotifyDelayMs() {
   }
   
   const diff = target.getTime() - now.getTime();
-  logPbNotify(`Сейчас: ${now.toLocaleTimeString("ru-RU")}, следующий запуск через ${Math.round(diff / 1000)} сек (${target.toLocaleTimeString("ru-RU")})`);
+  logPbNotify(`Сейчас (МСК): ${mskHour}:${minute < 10 ? "0" + minute : minute}, следующий запуск через ${Math.round(diff / 1000)} сек (${target.toLocaleTimeString("ru-RU", {timeZone: "Europe/Moscow"})})`);
   return diff;
 }
 
 export async function askOfficersForPb(client: Client) {
   const now = new Date();
-  const hour = now.getHours();
+  const mskHour = now.getUTCHours() + 3;
   const minute = now.getMinutes();
   const second = now.getSeconds();
   
-  logPbNotify(`Проверка времени: ${hour}:${minute < 10 ? "0" + minute : minute}:${second < 10 ? "0" + second : second}`);
+  logPbNotify(`Проверка времени: ${mskHour}:${minute < 10 ? "0" + minute : minute}:${second < 10 ? "0" + second : second}`);
   
-  if (hour === 17 && minute === 0) {
+  if (mskHour === 17 && minute === 0) {
     const today = new Date().toISOString().slice(0, 10);
     const { pbAnnounced: isPbAnnouncedToday, pbAnnounceDate: announcedDate } = getPbAnnounced();
-    const now = new Date();
-    const mskHour = now.getUTCHours() + 3;
-    if (mskHour < 17 || mskHour > 22) return;
     if (isPbAnnouncedToday && announcedDate === today) return;
 
     logPbNotify("Отправка уведомлений офицерам о ПБ");
@@ -107,10 +105,10 @@ export async function askOfficersForPb(client: Client) {
 
 export async function pbNotifyScheduler(client: Client) {
   const now = new Date();
-  const hour = now.getHours();
+  const mskHour = now.getUTCHours() + 3;
   if (
-    hour >= 17 &&
-    hour < 22
+    mskHour >= 17 &&
+    mskHour < 22
   ) {
     await askOfficersForPb(client);
   }
@@ -120,8 +118,8 @@ export async function pbNotifyScheduler(client: Client) {
 
 export async function autoPbAnnounceScheduler(client: Client) {
   const now = new Date();
-  const hour = now.getHours();
-  if (hour >= 17 && hour < 22) {
+  const mskHour = now.getUTCHours() + 3;
+  if (mskHour >= 17 && mskHour < 22) {
     const guild = client.guilds.cache.first();
     const channelIds = [
       "763085196118851608",

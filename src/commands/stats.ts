@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, TextChannel } from "discord.js";
 import { STATS_CHANNEL_ID } from "../constants";
-import { loadPrevAndCurrMembers } from "../utils/clan";
+import { loadMembersAtTime } from "../utils/clan";
 import { normalize } from "../utils/normalize";
 import { fetchClanLeaderboardInfo, loadLeaderboardData, compareLeaderboardData } from "../utils/leaderboard";
 
@@ -11,7 +11,8 @@ export async function statsCommand(interaction: ChatInputCommandInteraction) {
   const currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
   const previousLeaderboardData = loadLeaderboardData();
   
-  const [prev, curr] = loadPrevAndCurrMembers();
+  const prev = loadMembersAtTime("1650");
+  const curr = loadMembersAtTime("0120");
 
   // Сопоставим по нормализованному нику
   const prevMap = new Map<string, { nick: string; points: number }>();

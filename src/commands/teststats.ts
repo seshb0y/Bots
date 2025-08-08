@@ -1,6 +1,6 @@
 import { ChatInputCommandInteraction, TextChannel } from "discord.js";
 import { STATS_CHANNEL_ID } from "../constants";
-import { loadPrevAndCurrMembers } from "../utils/clan";
+import { loadMembersAtTime } from "../utils/clan";
 import { normalize } from "../utils/normalize";
 
 console.log("🔍 Загружаю модули в teststats...");
@@ -41,7 +41,8 @@ export async function teststatsCommand(interaction: ChatInputCommandInteraction)
     console.log("🔍 Предыдущие данные:", previousLeaderboardData);
     
     await interaction.editReply("📊 Анализирую данные участников...");
-    const [prev, curr] = loadPrevAndCurrMembers();
+    const prev = loadMembersAtTime("1650");
+    const curr = loadMembersAtTime("0120");
 
     // Сопоставим по нормализованному нику
     const prevMap = new Map<string, { nick: string; points: number }>();

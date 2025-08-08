@@ -1,5 +1,8 @@
 import { REST, Routes, SlashCommandBuilder } from "discord.js";
 import "dotenv/config";
+import { wtvehicleCommand } from "./commands/wtvehicle";
+import { wtcompareCommand } from "./commands/wtcompare";
+import { wtlistCommand } from "./commands/wtlist";
 
 const commands = [
   new SlashCommandBuilder()
@@ -72,6 +75,18 @@ const commands = [
   new SlashCommandBuilder()
     .setName("simpletest")
     .setDescription("Простая тестовая команда"),
+  new SlashCommandBuilder()
+    .setName("lichstat")
+    .setDescription("Получить статистику игрока War Thunder")
+    .addStringOption((option) =>
+      option
+        .setName("nickname")
+        .setDescription("Никнейм игрока в War Thunder")
+        .setRequired(true)
+    ),
+  wtvehicleCommand.data,
+  wtcompareCommand.data,
+  wtlistCommand.data,
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

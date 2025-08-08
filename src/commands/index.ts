@@ -10,6 +10,10 @@ import { syncclanCommand } from "./syncclan";
 import { resettleaversCommand } from "./resettleavers";
 import { teststatsCommand } from "./teststats";
 import { simpleTestCommand } from "./simple-test";
+import { lichstatCommand } from "./lichstat";
+import { wtvehicleCommand } from "./wtvehicle";
+import { wtcompareCommand } from "./wtcompare";
+import { wtlistCommand } from "./wtlist";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error } from "../utils/logger";
 
@@ -24,6 +28,10 @@ export {
   syncclanCommand,
   resettleaversCommand,
   teststatsCommand,
+  lichstatCommand,
+  wtvehicleCommand,
+  wtcompareCommand,
+  wtlistCommand,
 };
 
 export function setupCommands(client: Client) {
@@ -142,6 +150,18 @@ export function setupCommands(client: Client) {
             break;
           case "teststats":
             await teststatsCommand(interaction);
+            break;
+          case "lichstat":
+            await lichstatCommand(interaction);
+            break;
+          case "wtvehicle":
+            await wtvehicleCommand.execute(interaction);
+            break;
+          case "wtcompare":
+            await wtcompareCommand.execute(interaction);
+            break;
+          case "wtlist":
+            await wtlistCommand.execute(interaction);
             break;
           case "ping":
             await interaction.reply({ content: "🏓 Понг! Бот работает.", ephemeral: true });

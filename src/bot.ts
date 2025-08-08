@@ -240,28 +240,46 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 });
 
 function getNextStatsDelayMs() {
-  // Используем системное время
+  // Используем московское время (UTC+3)
   const now = new Date();
-  const hour = now.getHours();
+  const mskHour = (now.getUTCHours() + 3) % 24;
   const minute = now.getMinutes();
-  // Целевые времена: 16:50 и 01:20
+  
+  // Целевые времена: 16:50 и 01:20 (московское время)
   const targets = [
     { h: 16, m: 50 },
     { h: 1, m: 20 },
   ];
+  
   let minDiff = Infinity;
   let next = null;
+  
   for (const t of targets) {
-    let target = new Date(now);
-    target.setHours(t.h, t.m, 0, 0);
-    if (target <= now) target.setDate(target.getDate() + 1);
+    // Создаем целевое время для сегодня в московском времени
+    const today = new Date();
+    today.setUTCHours(t.h - 3, t.m, 0, 0);
+    
+    let target = today;
+    
+    // Если время уже прошло сегодня, переносим на завтра
+    if (today <= now) {
+      target = new Date(today);
+      target.setDate(target.getDate() + 1);
+    }
+    
     const diff = target.getTime() - now.getTime();
-    if (diff < minDiff) {
+    if (diff > 0 && diff < minDiff) {
       minDiff = diff;
       next = target;
     }
   }
-  logStats(`Сейчас (сервер): ${now.toLocaleTimeString("ru-RU")}, следующий запуск через ${Math.round(minDiff / 1000)} сек (${next?.toLocaleTimeString("ru-RU")})`);
+  
+  // Если не нашли подходящее время, ждем минимум 30 секунд
+  if (minDiff === Infinity || minDiff <= 0) {
+    minDiff = 30000; // Минимум 30 секунд
+  }
+  
+  logStats(`Сейчас (МСК): ${mskHour}:${minute < 10 ? "0" + minute : minute}, следующий запуск через ${Math.round(minDiff / 1000)} сек (${next?.toLocaleTimeString("ru-RU", {timeZone: "Europe/Moscow"})})`);
   return minDiff;
 }
 
@@ -343,13 +361,137 @@ async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserDa
 async function statsScheduler(client: Client) {
   const startTime = Date.now();
   
-  // Используем системное время
+  // Используем московское время (UTC+3)
   const now = new Date();
-  const hour = now.getHours();
+  const mskHour = (now.getUTCHours() + 3) % 24;
   const minute = now.getMinutes();
-  logStats(`Проверка времени: ${hour}:${minute < 10 ? "0" + minute : minute}`);
+  logStats(`Проверка времени: ${mskHour}:${minute < 10 ? "0" + minute : minute}`);
   
-  if (hour === 16 && minute === 50) {
+  // Проверяем, не пропустили ли мы время сбора статистики 01:20
+  const shouldCollectMissedStats = (mskHour > 1 || (mskHour === 1 && minute > 20)) && 
+                                   (mskHour < 16 || (mskHour === 16 && minute < 50));
+  
+  if (shouldCollectMissedStats) {
+    // Проверяем, есть ли уже данные за сегодняшнее 01:20
+    try {
+      const existingData = loadMembersAtTime("0120");
+      const today = new Date().toISOString().slice(0, 10);
+      
+             // Проверяем дату последней модификации файла данных
+       const fs = require('fs');
+       const path = require('path');
+       const dataFilePath = path.join(__dirname, "..", "data", "members_0120.json");
+       
+       let shouldCollect = existingData.length === 0;
+       if (!shouldCollect && fs.existsSync(dataFilePath)) {
+         const fileStats = fs.statSync(dataFilePath);
+         const fileDate = fileStats.mtime.toISOString().slice(0, 10);
+         shouldCollect = fileDate !== today;
+       }
+       
+       if (shouldCollect) {
+        logStats("Обнаружено пропущенное время сбора статистики 01:20, выполняем сбор сейчас");
+        
+        const members = await fetchClanPoints("ALLIANCE");
+        saveMembersAtTime(members, "0120");
+        logStats("Сохранено состояние участников (0120) - пропущенный сбор");
+        
+        // Получаем текущую информацию о лидерборде
+        logStats("Получение текущей информации о лидерборде...");
+        let currentLeaderboardInfo = null;
+        try {
+          currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+          if (currentLeaderboardInfo) {
+            logStats(`Получена информация о лидерборде: место ${currentLeaderboardInfo.position}, очки ${currentLeaderboardInfo.points}`);
+          } else {
+            logStats("Полк ALLIANCE не найден в лидерборде");
+          }
+        } catch (error) {
+          logStats(`Ошибка при получении информации о лидерборде: ${error}`);
+        }
+        const previousLeaderboardData = loadLeaderboardData();
+        
+        // Сравнить и отправить статистику
+        const prev = loadMembersAtTime("1650");
+        const curr = loadMembersAtTime("0120");
+        const prevMap = new Map(prev.map((p) => [normalize(p.nick), p]));
+        const currMap = new Map(curr.map((c) => [normalize(c.nick), c]));
+        let totalDelta = 0;
+        const changes = [];
+        for (const [nickNorm, currPlayer] of currMap.entries()) {
+          const prevPlayer = prevMap.get(nickNorm);
+          if (prevPlayer) {
+            const delta = currPlayer.points - prevPlayer.points;
+            if (delta !== 0) {
+              changes.push({ nick: currPlayer.nick, delta });
+              totalDelta += delta;
+            }
+          }
+        }
+        
+        let msg = `📊 **Статистика за сутки (пропущенный сбор):**\n`;
+        
+        // Добавляем информацию о лидерборде
+        if (currentLeaderboardInfo && previousLeaderboardData) {
+          const comparison = compareLeaderboardData(currentLeaderboardInfo, previousLeaderboardData);
+          
+          msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+          
+          if (comparison.positionDirection === "up") {
+            msg += `📈 Поднялись на ${comparison.positionChange} мест\n`;
+          } else if (comparison.positionDirection === "down") {
+            msg += `📉 Опустились на ${comparison.positionChange} мест\n`;
+          } else {
+            msg += `➡️ Место не изменилось\n`;
+          }
+          
+          msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n`;
+          
+          if (comparison.pointsDirection === "up") {
+            msg += `📈 Получили ${comparison.pointsChange.toLocaleString()} очков\n`;
+          } else if (comparison.pointsDirection === "down") {
+            msg += `📉 Потеряли ${comparison.pointsChange.toLocaleString()} очков\n`;
+          } else {
+            msg += `➡️ Очки не изменились\n`;
+          }
+          
+          msg += `\n`;
+        } else if (currentLeaderboardInfo) {
+          msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+          msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n\n`;
+        }
+        
+        msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;
+        
+        if (changes.length > 0) {
+          msg += `\nИзменения по игрокам:\n`;
+          for (const { nick, delta } of changes.sort((a, b) => b.delta - a.delta)) {
+            msg += `• ${nick}: ${delta >= 0 ? "+" : ""}${delta}\n`;
+          }
+        } else {
+          msg += `\nЗа сутки не было изменений очков ни у одного игрока.\n`;
+        }
+        
+        const channel = await client.channels.fetch(STATS_CHANNEL_ID);
+        if (channel && channel.isTextBased()) {
+          await (channel as TextChannel).send(msg);
+          logStats("Статистика отправлена в канал (пропущенный сбор)");
+        }
+        
+        // Проверка конца сезона: все points = 0
+        if (curr.every(p => p.points === 0)) {
+          logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
+          const users = loadJson<Record<string, UserData>>(usersPath);
+          const guild = client.guilds.cache.first();
+          if (guild) {
+            await handleSeasonEndRewards(guild, users);
+          }
+        }
+      }
+    } catch (error) {
+      logStats(`Ошибка при проверке пропущенного сбора статистики: ${error}`);
+    }
+  } else if (mskHour === 16 && minute === 50) {
     logStats("Сбор состояния участников (16:50)");
     const members = await fetchClanPoints("ALLIANCE");
     saveMembersAtTime(members, "1650");
@@ -372,7 +514,7 @@ async function statsScheduler(client: Client) {
     
     const users = loadJson<Record<string, UserData>>(usersPath);
     await updateAchievers(users, members);
-  } else if (hour === 1 && minute === 20) {
+  } else if (mskHour === 1 && minute === 20) {
     logStats("Сбор состояния участников и отправка статистики (01:20)");
     const members = await fetchClanPoints("ALLIANCE");
     saveMembersAtTime(members, "0120");
@@ -474,42 +616,174 @@ async function statsScheduler(client: Client) {
   }
   
   trackFunctionPerformance('statsScheduler', startTime);
-  setTimeout(() => statsScheduler(client), getNextStatsDelayMs());
+  const delay = Math.max(getNextStatsDelayMs(), 30000); // Минимум 30 секунд между проверками
+  setTimeout(() => statsScheduler(client), delay);
 }
 
 function getNextSyncclanDelayMs() {
   const now = new Date();
-  const hour = now.getHours();
+  const mskHour = (now.getUTCHours() + 3) % 24;
   const minute = now.getMinutes();
   const second = now.getSeconds();
   
-  // Целевое время: 12:00
+  // Целевое время: 12:00 (московское время)
   const targetHour = 12;
   const targetMinute = 0;
   
-  let target = new Date(now);
-  target.setHours(targetHour, targetMinute, 0, 0);
+  // Создаем целевое время для сегодня в московском времени
+  const today = new Date();
+  today.setUTCHours(targetHour - 3, targetMinute, 0, 0);
   
-  // Если сегодня 12:00 уже прошло, ждем до завтра
-  if (target <= now) {
-    target.setDate(target.getDate() + 1);
+  // Создаем целевое время для завтра в московском времени
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  // Выбираем ближайшее время (сегодня или завтра)
+  let target = today;
+  if (today <= now) {
+    target = tomorrow;
   }
   
   const diff = target.getTime() - now.getTime();
-  logSyncclan(`Сейчас: ${now.toLocaleTimeString("ru-RU")}, следующий запуск через ${Math.round(diff / 1000)} сек (${target.toLocaleTimeString("ru-RU")})`);
-  return diff;
+  
+  // Убеждаемся, что задержка не отрицательная
+  const finalDiff = Math.max(diff, 30000); // Минимум 30 секунд
+  
+  logSyncclan(`Сейчас (МСК): ${mskHour}:${minute < 10 ? "0" + minute : minute}, следующий запуск через ${Math.round(finalDiff / 1000)} сек (${target.toLocaleTimeString("ru-RU", {timeZone: "Europe/Moscow"})})`);
+  return finalDiff;
 }
 
 async function syncclanScheduler(client: Client) {
   const startTime = Date.now();
   
   const now = new Date();
-  const hour = now.getHours();
+  const mskHour = (now.getUTCHours() + 3) % 24;
   const minute = now.getMinutes();
   
-  logSyncclan(`Проверка времени: ${hour}:${minute < 10 ? "0" + minute : minute}`);
+  logSyncclan(`Проверка времени: ${mskHour}:${minute < 10 ? "0" + minute : minute}`);
   
-  if (hour === 12 && minute === 0) {
+  // Проверяем, не пропустили ли мы время синхронизации 12:00
+  const shouldSyncMissed = (mskHour > 12 || (mskHour < 12 && mskHour > 0));
+  
+  if (shouldSyncMissed) {
+    // Проверяем, была ли уже синхронизация сегодня
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const leaversFilePath = path.join(__dirname, "..", "data", "leavers_tracking.json");
+      
+      let shouldSync = false;
+      const today = new Date().toISOString().slice(0, 10);
+      
+      if (fs.existsSync(leaversFilePath)) {
+        const fileStats = fs.statSync(leaversFilePath);
+        const fileDate = fileStats.mtime.toISOString().slice(0, 10);
+        shouldSync = fileDate !== today;
+      } else {
+        shouldSync = true; // Файл не существует, нужна синхронизация
+      }
+      
+      if (shouldSync) {
+        logSyncclan("Обнаружено пропущенное время синхронизации 12:00, выполняем синхронизацию сейчас");
+        
+        // Выполняем полную синхронизацию
+        const users = loadJson<Record<string, UserData>>(usersPath);
+        const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
+        const members = await fetchClanPoints("ALLIANCE");
+
+        // 1. Загрузить отслеживаемых участников и найти покинувших
+        const trackedMembers = loadLeaversTracking();
+        
+        // Если файл отслеживания пустой, инициализируем его текущими участниками
+        if (trackedMembers.length === 0) {
+          logSyncclan("Инициализация файла отслеживания покинувших игроков (пропущенная синхронизация)");
+          saveLeaversTracking(members);
+        } else {
+          // Находим покинувших игроков
+          const currentNicks = new Set(members.map(m => normalize(m.nick)));
+          const leavers = trackedMembers.filter(m => !currentNicks.has(normalize(m.nick)));
+          
+          if (leavers.length > 0) {
+            logSyncclan(`Найдено покинувших игроков: ${leavers.length} (пропущенная синхронизация)`);
+            for (const leaver of leavers) {
+              logSyncclan(`Покинул полк: ${leaver.nick} (${leaver.points} очков)`);
+            }
+          }
+          
+          // Обновляем список отслеживаемых
+          saveLeaversTracking(members);
+        }
+
+        // 2. Синхронизация ролей и данных
+        const guild = client.guilds.cache.first();
+        if (guild) {
+          let syncCount = 0;
+          
+          for (const member of members) {
+            const normalizedNick = normalize(member.nick);
+            
+                         // Найти пользователя в базе данных
+             let userId = null;
+             for (const [id, userData] of Object.entries(users)) {
+               if (userData.nick && normalize(userData.nick) === normalizedNick) {
+                 userId = id;
+                 break;
+               }
+             }
+             
+             if (userId) {
+               // Обновить данные пользователя
+               users[userId].points = member.points;
+              
+              // Обновить роли
+              try {
+                const guildMember = await guild.members.fetch(userId);
+                if (guildMember) {
+                  const hasServiceRole = SERVICE_ROLES.some(roleId => 
+                    guildMember.roles.cache.has(roleId)
+                  );
+                  
+                  if (member.points >= 1600 && !guildMember.roles.cache.has(HONOR_ROLE)) {
+                    await guildMember.roles.add(HONOR_ROLE);
+                    logSyncclan(`Добавлена роль почета для ${member.nick} (${member.points} очков)`);
+                  } else if (member.points < 1600 && guildMember.roles.cache.has(HONOR_ROLE) && !hasServiceRole) {
+                    await guildMember.roles.remove(HONOR_ROLE);
+                    logSyncclan(`Убрана роль почета у ${member.nick} (${member.points} очков)`);
+                  }
+                }
+              } catch (error) {
+                logSyncclan(`Ошибка при обновлении ролей для ${member.nick}: ${error}`);
+              }
+              
+              syncCount++;
+            } else {
+                             // Добавить в отслеживаемых
+               if (!tracked[normalizedNick]) {
+                 tracked[normalizedNick] = {
+                   trackedSince: new Date().toISOString(),
+                   assignedBy: "system",
+                   warnedAfter7d: false,
+                   warnedAfter14d: false,
+                   lastPoints: member.points
+                 };
+                 logSyncclan(`Добавлен в отслеживание: ${member.nick} (${member.points} очков)`);
+               } else {
+                 tracked[normalizedNick].lastPoints = member.points;
+               }
+            }
+          }
+          
+          // Сохранить обновленные данные
+          saveJson(usersPath, users);
+          saveJson(trackedPath, tracked);
+          
+          logSyncclan(`Синхронизация завершена (пропущенная): обновлено ${syncCount} участников, отслеживается ${Object.keys(tracked).length} игроков`);
+        }
+      }
+    } catch (error) {
+      logSyncclan(`Ошибка при проверке пропущенной синхронизации: ${error}`);
+    }
+  } else if (mskHour === 12 && minute === 0) {
     logSyncclan("Автоматический запуск синхронизации клана ALLIANCE");
     
     try {
@@ -574,14 +848,15 @@ async function syncclanScheduler(client: Client) {
 
       logSyncclan(`Синхронизировано ${count} участников по клану ALLIANCE`);
     } catch (error: any) {
-      error("Ошибка при автоматической синхронизации", error);
+      logSyncclan(`Ошибка при автоматической синхронизации: ${error.message}`);
     }
   } else {
     logSyncclan("Сейчас не время синхронизации клана");
   }
   
   trackFunctionPerformance('syncclanScheduler', startTime);
-  setTimeout(() => syncclanScheduler(client), getNextSyncclanDelayMs());
+  const delay = Math.max(getNextSyncclanDelayMs(), 30000); // Минимум 30 секунд между проверками
+  setTimeout(() => syncclanScheduler(client), delay);
 }
 
 client.once("ready", async () => {
