@@ -824,5 +824,26 @@
     "warnedAfter7d": false,
     "warnedAfter14d": false,
     "lastPoints": 123
+  },
+  "катясaмбукa": {
+    "trackedSince": "2025-08-09T12:03:14.013Z",
+    "assignedBy": "system",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 1456
+  },
+  "TestPlayer": {
+    "trackedSince": "2025-08-09T12:21:03.756Z",
+    "assignedBy": "test-user-id",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 0
+  },
+  "kobra200": {
+    "trackedSince": "2025-08-09T12:44:46.037Z",
+    "assignedBy": "system",
+    "warnedAfter7d": false,
+    "warnedAfter14d": false,
+    "lastPoints": 0
   }
 }

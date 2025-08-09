@@ -1,8 +1,5 @@
 import { REST, Routes, SlashCommandBuilder } from "discord.js";
 import "dotenv/config";
-import { wtvehicleCommand } from "./commands/wtvehicle";
-import { wtcompareCommand } from "./commands/wtcompare";
-import { wtlistCommand } from "./commands/wtlist";
 
 const commands = [
   new SlashCommandBuilder()
@@ -84,9 +81,10 @@ const commands = [
         .setDescription("Никнейм игрока в War Thunder")
         .setRequired(true)
     ),
-  wtvehicleCommand.data,
-  wtcompareCommand.data,
-  wtlistCommand.data,
+  new SlashCommandBuilder()
+    .setName("runtests")
+    .setDescription("Запустить тестирование бота (только для администраторов)")
+    .setDefaultMemberPermissions(0),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);
