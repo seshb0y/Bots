@@ -24,10 +24,10 @@ import {
   saveMembersAtTime,
   loadMembersAtTime,
   fetchClanPoints,
-  loadLeaversTracking,
-  saveLeaversTracking,
-  findLeaversFromTracking,
   saveMembersAlternating,
+  saveCurrentMembers,
+  loadCurrentMembers,
+  compareMembersData,
 } from "./utils/clan";
 import {
   fetchClanLeaderboardInfo,
@@ -290,7 +290,7 @@ const SERVICE_ROLES = [
 ];
 const HONOR_ROLE = "1217444648591687700";
 
-const ACHIEVERS_PATH = path.join(__dirname, "..", "data", "season_achievers.json");
+const ACHIEVERS_PATH = path.join(__dirname, "..", "..", "data", "season_achievers.json");
 
 function loadAchievers(): Set<string> {
   if (!fs.existsSync(ACHIEVERS_PATH)) return new Set();
@@ -358,6 +358,118 @@ async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserDa
   logReward("Награды за сезон выданы, файл достижений очищен");
 }
 
+// Функция для полной синхронизации клана
+async function performFullClanSync(client: Client) {
+  logSyncclan("Начало полной синхронизации клана ALLIANCE");
+  
+  try {
+    const users = loadJson<Record<string, UserData>>(usersPath);
+    const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
+    const members = await fetchClanPoints("ALLIANCE");
+
+    // 1. Загрузить предыдущие данные участников и найти покинувших
+    const previousMembers = loadCurrentMembers();
+    
+    // Если файл пустой, это первая синхронизация
+    if (previousMembers.length === 0) {
+      logSyncclan("Первая синхронизация клана - инициализация данных");
+    } else {
+      // Находим покинувших игроков
+      const currentNicks = new Set(members.map(m => normalize(m.nick)));
+      const leavers = previousMembers.filter(m => !currentNicks.has(normalize(m.nick)));
+      
+      logSyncclan(`Предыдущих участников: ${previousMembers.length}`);
+      logSyncclan(`Текущих участников: ${members.length}`);
+      logSyncclan(`Покинувших игроков: ${leavers.length}`);
+      
+      if (leavers.length > 0) {
+        const channel = await client.channels.fetch("882263905009807390");
+        const date = new Date().toLocaleDateString("ru-RU");
+        for (const leaver of leavers) {
+          const msg = `${leaver.nick} покинул полк ${date} с ${leaver.points} лпр`;
+          if (channel && channel.isTextBased()) {
+            await (channel as TextChannel).send(msg);
+          }
+        }
+        logSyncclan(`Отправлено уведомлений о покинувших: ${leavers.length}`);
+      }
+    }
+
+    // 3. Синхронизация ролей и данных
+    const guild = client.guilds.cache.first();
+    if (guild) {
+      let syncCount = 0;
+      
+      for (const member of members) {
+        const normalizedNick = normalize(member.nick);
+        
+        // Найти пользователя в базе данных
+        let userId = null;
+        for (const [id, userData] of Object.entries(users)) {
+          if (userData.nick && normalize(userData.nick) === normalizedNick) {
+            userId = id;
+            break;
+          }
+        }
+        
+        if (userId) {
+          // Обновить данные пользователя
+          users[userId].points = member.points;
+         
+          // Обновить роли
+          try {
+            const guildMember = await guild.members.fetch(userId);
+            if (guildMember) {
+              const hasServiceRole = SERVICE_ROLES.some(roleId => 
+                guildMember.roles.cache.has(roleId)
+              );
+              
+              if (member.points >= 1600 && !guildMember.roles.cache.has(HONOR_ROLE)) {
+                await guildMember.roles.add(HONOR_ROLE);
+                logSyncclan(`Добавлена роль почета для ${member.nick} (${member.points} очков)`);
+              } else if (member.points < 1600 && guildMember.roles.cache.has(HONOR_ROLE) && !hasServiceRole) {
+                await guildMember.roles.remove(HONOR_ROLE);
+                logSyncclan(`Убрана роль почета у ${member.nick} (${member.points} очков)`);
+              }
+            }
+          } catch (error) {
+            logSyncclan(`Ошибка при обновлении ролей для ${member.nick}: ${error}`);
+          }
+          
+          syncCount++;
+        } else {
+          // Добавить в отслеживаемых
+          if (!tracked[normalizedNick]) {
+            tracked[normalizedNick] = {
+              trackedSince: new Date().toISOString(),
+              assignedBy: "system",
+              warnedAfter7d: false,
+              warnedAfter14d: false,
+              lastPoints: member.points
+            };
+            logSyncclan(`Добавлен в отслеживание: ${member.nick} (${member.points} очков)`);
+          } else {
+            tracked[normalizedNick].lastPoints = member.points;
+          }
+        }
+      }
+      
+      // Сохранить обновленные данные
+      saveJson(usersPath, users);
+      saveJson(trackedPath, tracked);
+      
+      logSyncclan(`Синхронизация завершена: обновлено ${syncCount} участников, отслеживается ${Object.keys(tracked).length} игроков`);
+    }
+
+    // 4. Сохранить новые данные в основной файл
+    saveCurrentMembers(members);
+    logSyncclan("Данные сохранены в основной файл участников");
+
+  } catch (error: any) {
+    logSyncclan(`Ошибка при полной синхронизации клана: ${error.message}`);
+  }
+}
+
 async function statsScheduler(client: Client) {
   const startTime = Date.now();
   
@@ -374,27 +486,28 @@ async function statsScheduler(client: Client) {
   if (shouldCollectMissedStats) {
     // Проверяем, есть ли уже данные за сегодняшнее 01:20
     try {
-      const existingData = loadMembersAtTime("0120");
+      const existingData = loadCurrentMembers();
       const today = new Date().toISOString().slice(0, 10);
       
-             // Проверяем дату последней модификации файла данных
-       const fs = require('fs');
-       const path = require('path');
-       const dataFilePath = path.join(__dirname, "..", "data", "members_0120.json");
-       
-       let shouldCollect = existingData.length === 0;
-       if (!shouldCollect && fs.existsSync(dataFilePath)) {
-         const fileStats = fs.statSync(dataFilePath);
-         const fileDate = fileStats.mtime.toISOString().slice(0, 10);
-         shouldCollect = fileDate !== today;
-       }
-       
-       if (shouldCollect) {
+      // Проверяем дату последней модификации файла данных
+      const fs = require('fs');
+      const path = require('path');
+      const dataFilePath = path.join(__dirname, "..", "..", "data", "members_current.json");
+      
+      let shouldCollect = existingData.length === 0;
+      if (!shouldCollect && fs.existsSync(dataFilePath)) {
+        const fileStats = fs.statSync(dataFilePath);
+        const fileDate = fileStats.mtime.toISOString().slice(0, 10);
+        shouldCollect = fileDate !== today;
+      }
+      
+      if (shouldCollect) {
         logStats("Обнаружено пропущенное время сбора статистики 01:20, выполняем сбор сейчас");
         
         const members = await fetchClanPoints("ALLIANCE");
-        saveMembersAtTime(members, "0120");
-        logStats("Сохранено состояние участников (0120) - пропущенный сбор");
+        
+        // Получаем предыдущие данные из основного файла
+        const prev = loadCurrentMembers();
         
         // Получаем текущую информацию о лидерборде
         logStats("Получение текущей информации о лидерборде...");
@@ -412,22 +525,7 @@ async function statsScheduler(client: Client) {
         const previousLeaderboardData = loadLeaderboardData();
         
         // Сравнить и отправить статистику
-        const prev = loadMembersAtTime("1650");
-        const curr = loadMembersAtTime("0120");
-        const prevMap = new Map(prev.map((p) => [normalize(p.nick), p]));
-        const currMap = new Map(curr.map((c) => [normalize(c.nick), c]));
-        let totalDelta = 0;
-        const changes = [];
-        for (const [nickNorm, currPlayer] of currMap.entries()) {
-          const prevPlayer = prevMap.get(nickNorm);
-          if (prevPlayer) {
-            const delta = currPlayer.points - prevPlayer.points;
-            if (delta !== 0) {
-              changes.push({ nick: currPlayer.nick, delta });
-              totalDelta += delta;
-            }
-          }
-        }
+        const { totalDelta, changes } = compareMembersData(prev, members);
         
         let msg = `📊 **Статистика за сутки (пропущенный сбор):**\n`;
         
@@ -478,8 +576,12 @@ async function statsScheduler(client: Client) {
           logStats("Статистика отправлена в канал (пропущенный сбор)");
         }
         
+        // Сохраняем новые данные в основной файл
+        saveCurrentMembers(members);
+        logStats("Обновлен основной файл участников новыми данными (пропущенный сбор)");
+        
         // Проверка конца сезона: все points = 0
-        if (curr.every(p => p.points === 0)) {
+        if (members.every(p => p.points === 0)) {
           logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
           const users = loadJson<Record<string, UserData>>(usersPath);
           const guild = client.guilds.cache.first();
@@ -492,10 +594,10 @@ async function statsScheduler(client: Client) {
       logStats(`Ошибка при проверке пропущенного сбора статистики: ${error}`);
     }
   } else if (mskHour === 16 && minute === 50) {
-    logStats("Сбор состояния участников (16:50)");
-    const members = await fetchClanPoints("ALLIANCE");
-    saveMembersAtTime(members, "1650");
-    logStats("Сохранено состояние участников (1650)");
+    logStats("Полная синхронизация клана и сбор статистики (16:50)");
+    
+    // Выполняем полную синхронизацию клана
+    await performFullClanSync(client);
     
     // Получаем информацию о месте полка в лидерборде
     logStats("Получение информации о месте полка в лидерборде...");
@@ -512,13 +614,16 @@ async function statsScheduler(client: Client) {
       logStats("Не удалось получить информацию о лидерборде");
     }
     
+    // Обновляем достижения
+    const members = loadCurrentMembers();
     const users = loadJson<Record<string, UserData>>(usersPath);
     await updateAchievers(users, members);
   } else if (mskHour === 1 && minute === 20) {
     logStats("Сбор состояния участников и отправка статистики (01:20)");
     const members = await fetchClanPoints("ALLIANCE");
-    saveMembersAtTime(members, "0120");
-    logStats("Сохранено состояние участников (0120)");
+    
+    // Получаем предыдущие данные из основного файла
+    const prev = loadCurrentMembers();
     
     // Получаем текущую информацию о лидерборде
     logStats("Получение текущей информации о лидерборде...");
@@ -536,22 +641,7 @@ async function statsScheduler(client: Client) {
     const previousLeaderboardData = loadLeaderboardData();
     
     // Сравнить и отправить статистику
-    const prev = loadMembersAtTime("1650");
-    const curr = loadMembersAtTime("0120");
-    const prevMap = new Map(prev.map((p) => [normalize(p.nick), p]));
-    const currMap = new Map(curr.map((c) => [normalize(c.nick), c]));
-    let totalDelta = 0;
-    const changes = [];
-    for (const [nickNorm, currPlayer] of currMap.entries()) {
-      const prevPlayer = prevMap.get(nickNorm);
-      if (prevPlayer) {
-        const delta = currPlayer.points - prevPlayer.points;
-        if (delta !== 0) {
-          changes.push({ nick: currPlayer.nick, delta });
-          totalDelta += delta;
-        }
-      }
-    }
+    const { totalDelta, changes } = compareMembersData(prev, members);
     
     let msg = `\uD83D\uDCCA **Статистика за сутки:**\n`;
     
@@ -602,8 +692,12 @@ async function statsScheduler(client: Client) {
       logStats("Статистика отправлена в канал");
     }
     
+    // Сохраняем новые данные в основной файл
+    saveCurrentMembers(members);
+    logStats("Обновлен основной файл участников новыми данными");
+    
     // Проверка конца сезона: все points = 0
-    if (curr.every(p => p.points === 0)) {
+    if (members.every(p => p.points === 0)) {
       logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
       const users = loadJson<Record<string, UserData>>(usersPath);
       const guild = client.guilds.cache.first();
@@ -626,9 +720,9 @@ function getNextSyncclanDelayMs() {
   const minute = now.getMinutes();
   const second = now.getSeconds();
   
-  // Целевое время: 12:00 (московское время)
-  const targetHour = 12;
-  const targetMinute = 0;
+  // Целевое время: 16:50 (московское время)
+  const targetHour = 16;
+  const targetMinute = 50;
   
   // Создаем целевое время для сегодня в московском времени
   const today = new Date();
@@ -662,21 +756,21 @@ async function syncclanScheduler(client: Client) {
   
   logSyncclan(`Проверка времени: ${mskHour}:${minute < 10 ? "0" + minute : minute}`);
   
-  // Проверяем, не пропустили ли мы время синхронизации 12:00
-  const shouldSyncMissed = (mskHour > 12 || (mskHour < 12 && mskHour > 0));
+  // Проверяем, не пропустили ли мы время синхронизации 16:50
+  const shouldSyncMissed = (mskHour > 16 || (mskHour === 16 && minute > 50));
   
   if (shouldSyncMissed) {
     // Проверяем, была ли уже синхронизация сегодня
     try {
       const fs = require('fs');
       const path = require('path');
-      const leaversFilePath = path.join(__dirname, "..", "data", "leavers_tracking.json");
+      const membersFilePath = path.join(__dirname, "..", "..", "data", "members_current.json");
       
       let shouldSync = false;
       const today = new Date().toISOString().slice(0, 10);
       
-      if (fs.existsSync(leaversFilePath)) {
-        const fileStats = fs.statSync(leaversFilePath);
+      if (fs.existsSync(membersFilePath)) {
+        const fileStats = fs.statSync(membersFilePath);
         const fileDate = fileStats.mtime.toISOString().slice(0, 10);
         shouldSync = fileDate !== today;
       } else {
@@ -684,171 +778,13 @@ async function syncclanScheduler(client: Client) {
       }
       
       if (shouldSync) {
-        logSyncclan("Обнаружено пропущенное время синхронизации 12:00, выполняем синхронизацию сейчас");
+        logSyncclan("Обнаружено пропущенное время синхронизации 16:50, выполняем синхронизацию сейчас");
         
-        // Выполняем полную синхронизацию
-        const users = loadJson<Record<string, UserData>>(usersPath);
-        const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
-        const members = await fetchClanPoints("ALLIANCE");
-
-        // 1. Загрузить отслеживаемых участников и найти покинувших
-        const trackedMembers = loadLeaversTracking();
-        
-        // Если файл отслеживания пустой, инициализируем его текущими участниками
-        if (trackedMembers.length === 0) {
-          logSyncclan("Инициализация файла отслеживания покинувших игроков (пропущенная синхронизация)");
-          saveLeaversTracking(members);
-        } else {
-          // Находим покинувших игроков
-          const currentNicks = new Set(members.map(m => normalize(m.nick)));
-          const leavers = trackedMembers.filter(m => !currentNicks.has(normalize(m.nick)));
-          
-          if (leavers.length > 0) {
-            logSyncclan(`Найдено покинувших игроков: ${leavers.length} (пропущенная синхронизация)`);
-            for (const leaver of leavers) {
-              logSyncclan(`Покинул полк: ${leaver.nick} (${leaver.points} очков)`);
-            }
-          }
-          
-          // Обновляем список отслеживаемых
-          saveLeaversTracking(members);
-        }
-
-        // 2. Синхронизация ролей и данных
-        const guild = client.guilds.cache.first();
-        if (guild) {
-          let syncCount = 0;
-          
-          for (const member of members) {
-            const normalizedNick = normalize(member.nick);
-            
-                         // Найти пользователя в базе данных
-             let userId = null;
-             for (const [id, userData] of Object.entries(users)) {
-               if (userData.nick && normalize(userData.nick) === normalizedNick) {
-                 userId = id;
-                 break;
-               }
-             }
-             
-             if (userId) {
-               // Обновить данные пользователя
-               users[userId].points = member.points;
-              
-              // Обновить роли
-              try {
-                const guildMember = await guild.members.fetch(userId);
-                if (guildMember) {
-                  const hasServiceRole = SERVICE_ROLES.some(roleId => 
-                    guildMember.roles.cache.has(roleId)
-                  );
-                  
-                  if (member.points >= 1600 && !guildMember.roles.cache.has(HONOR_ROLE)) {
-                    await guildMember.roles.add(HONOR_ROLE);
-                    logSyncclan(`Добавлена роль почета для ${member.nick} (${member.points} очков)`);
-                  } else if (member.points < 1600 && guildMember.roles.cache.has(HONOR_ROLE) && !hasServiceRole) {
-                    await guildMember.roles.remove(HONOR_ROLE);
-                    logSyncclan(`Убрана роль почета у ${member.nick} (${member.points} очков)`);
-                  }
-                }
-              } catch (error) {
-                logSyncclan(`Ошибка при обновлении ролей для ${member.nick}: ${error}`);
-              }
-              
-              syncCount++;
-            } else {
-                             // Добавить в отслеживаемых
-               if (!tracked[normalizedNick]) {
-                 tracked[normalizedNick] = {
-                   trackedSince: new Date().toISOString(),
-                   assignedBy: "system",
-                   warnedAfter7d: false,
-                   warnedAfter14d: false,
-                   lastPoints: member.points
-                 };
-                 logSyncclan(`Добавлен в отслеживание: ${member.nick} (${member.points} очков)`);
-               } else {
-                 tracked[normalizedNick].lastPoints = member.points;
-               }
-            }
-          }
-          
-          // Сохранить обновленные данные
-          saveJson(usersPath, users);
-          saveJson(trackedPath, tracked);
-          
-          logSyncclan(`Синхронизация завершена (пропущенная): обновлено ${syncCount} участников, отслеживается ${Object.keys(tracked).length} игроков`);
-        }
+        // Выполняем полную синхронизацию используя ту же функцию
+        await performFullClanSync(client);
       }
     } catch (error) {
       logSyncclan(`Ошибка при проверке пропущенной синхронизации: ${error}`);
-    }
-  } else if (mskHour === 12 && minute === 0) {
-    logSyncclan("Автоматический запуск синхронизации клана ALLIANCE");
-    
-    try {
-      // Имитируем выполнение команды syncclan ALLIANCE
-      const users = loadJson<Record<string, UserData>>(usersPath);
-      const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
-      const members = await fetchClanPoints("ALLIANCE");
-
-      // 1. Загрузить отслеживаемых участников и найти покинувших
-      const trackedMembers = loadLeaversTracking();
-      
-      // Если файл отслеживания пустой, инициализируем его текущими участниками
-      if (trackedMembers.length === 0) {
-        logSyncclan("Инициализация файла отслеживания покинувших игроков");
-        saveLeaversTracking(members);
-        logSyncclan(`Файл отслеживания инициализирован с ${members.length} участниками клана ALLIANCE`);
-      } else {
-        const leavers = findLeaversFromTracking(members);
-        logSyncclan(`trackedMembers: ${trackedMembers.map(m => m.nick)}`);
-        logSyncclan(`currentMembers: ${members.map(m => m.nick)}`);
-        logSyncclan(`leavers: ${leavers.map(m => m.nick)}`);
-        
-        if (leavers.length > 0) {
-          const channel = await client.channels.fetch("882263905009807390");
-          const date = new Date().toLocaleDateString("ru-RU");
-          for (const leaver of leavers) {
-            const msg = `${leaver.nick} покинул полк ${date} с ${leaver.points} лпр`;
-            if (channel && channel.isTextBased()) {
-              await (channel as TextChannel).send(msg);
-            }
-          }
-          logSyncclan(`Отправлено уведомлений о покинувших: ${leavers.length}`);
-        }
-
-        // 2. Обновить файл отслеживания текущими участниками
-        saveLeaversTracking(members);
-      }
-
-      // 3. Сохранить новые данные в следующий файл (для статистики)
-      saveMembersAlternating(members);
-
-      let count = 0;
-      for (const m of members) {
-        const uid = Object.keys(users).find(
-          (id) => normalize(users[id].nick ?? "") === normalize(m.nick)
-        );
-        if (uid) {
-          users[uid].points = m.points;
-          count++;
-        }
-        const trackedKey = Object.keys(tracked).find(
-          (t) => normalize(t) === normalize(m.nick)
-        );
-        if (trackedKey) {
-          tracked[trackedKey].lastPoints = m.points;
-          count++;
-        }
-      }
-
-      saveJson(usersPath, users);
-      saveJson(trackedPath, tracked);
-
-      logSyncclan(`Синхронизировано ${count} участников по клану ALLIANCE`);
-    } catch (error: any) {
-      logSyncclan(`Ошибка при автоматической синхронизации: ${error.message}`);
     }
   } else {
     logSyncclan("Сейчас не время синхронизации клана");

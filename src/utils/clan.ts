@@ -163,3 +163,48 @@ export function findLeaversFromTracking(
   const currNicks = new Set(currentMembers.map((m) => normalizeNick(m.nick)));
   return trackedMembers.filter((m) => !currNicks.has(normalizeNick(m.nick)));
 }
+
+// Новые функции для работы с одним файлом участников
+const membersCurrentPath = path.join(__dirname, "..", "data", "members_current.json");
+
+// Сохраняет текущих участников в основной файл
+export function saveCurrentMembers(
+  members: { nick: string; points: number }[]
+) {
+  fs.writeFileSync(membersCurrentPath, JSON.stringify(members, null, 2));
+}
+
+// Загружает текущих участников из основного файла
+export function loadCurrentMembers(): { nick: string; points: number }[] {
+  if (!fs.existsSync(membersCurrentPath)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(membersCurrentPath, "utf-8"));
+  } catch {
+    return [];
+  }
+}
+
+// Сравнивает предыдущие и текущие данные участников
+export function compareMembersData(
+  prev: { nick: string; points: number }[],
+  curr: { nick: string; points: number }[]
+): { totalDelta: number; changes: { nick: string; delta: number }[] } {
+  const prevMap = new Map(prev.map((p) => [normalizeNick(p.nick), p]));
+  const currMap = new Map(curr.map((c) => [normalizeNick(c.nick), c]));
+  
+  let totalDelta = 0;
+  const changes: { nick: string; delta: number }[] = [];
+  
+  for (const [nickNorm, currPlayer] of currMap.entries()) {
+    const prevPlayer = prevMap.get(nickNorm);
+    if (prevPlayer) {
+      const delta = currPlayer.points - prevPlayer.points;
+      if (delta !== 0) {
+        changes.push({ nick: currPlayer.nick, delta });
+        totalDelta += delta;
+      }
+    }
+  }
+  
+  return { totalDelta, changes };
+}

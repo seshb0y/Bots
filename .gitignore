@@ -50,6 +50,7 @@ jspm_packages/
 # dotenv environment variables file
 .env
 
+
 # IDE files
 .vscode/
 .idea/
@@ -68,3 +69,4 @@ Thumbs.db
 # Deploy files
 discord-bot-deploy.zip
 *.zip
+dist/

@@ -4,7 +4,7 @@ import { usersPath, trackedPath } from "../constants";
 import { UserData, TrackedPlayer } from "../types";
 import {
   fetchClanPoints,
-  saveMembersAlternating,
+  saveCurrentMembers,
   loadPrevAndCurrMembers,
   findLeavers,
   loadLeaversTracking,
@@ -65,8 +65,8 @@ export async function syncclanCommand(
   // 2. Обновить файл отслеживания текущими участниками
   saveLeaversTracking(members);
 
-  // 3. Сохранить новые данные в следующий файл (для статистики)
-  saveMembersAlternating(members);
+  // 3. Сохранить новые данные в основной файл
+  saveCurrentMembers(members);
 
   let count = 0;
   for (const m of members) {
