@@ -29,6 +29,7 @@ import {
   loadCurrentMembers,
   compareMembersData,
 } from "./utils/clan";
+import { markStatsCollectionCompleted, wasStatsCollectionCompleted, getLastCollectionTime } from "./utils/stats-tracking";
 import {
   fetchClanLeaderboardInfo,
   saveLeaderboardData,
@@ -310,21 +311,76 @@ function clearAchievers() {
   fs.writeFileSync(ACHIEVERS_PATH, "[]", "utf-8");
 }
 
-async function updateAchievers(users: Record<string, UserData>, members: { nick: string; points: number }[]) {
+async function updateAchievers(client: Client, users: Record<string, UserData>, members: { nick: string; points: number }[]) {
   const achievers = loadAchievers();
-  // Сопоставим ник -> userId
+  const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
+  
+  // Сопоставим ник -> userId из users.json
   const nickToUserId = new Map<string, string>();
   for (const [uid, data] of Object.entries(users)) {
-    nickToUserId.set(normalize(data.nick), uid);
+    if (data.nick) {
+      nickToUserId.set(normalize(data.nick), uid);
+    }
   }
+  
+  // Сопоставим ник -> userId из tracked.json (если нет в users.json)
+  for (const [nick, data] of Object.entries(tracked)) {
+    if (!nickToUserId.has(normalize(nick))) {
+      // Ищем пользователя в Discord сервере по никнейму
+      const guild = client.guilds.cache.first();
+      if (guild) {
+        try {
+          // Ищем по точному никнейму
+          let member = await guild.members.search({ query: nick, limit: 1 });
+          
+          // Если не найден, ищем по формату "DeDky4er (Никита)"
+          if (member.size === 0) {
+            const searchQuery = `${nick} (`;
+            const searchResults = await guild.members.search({ query: searchQuery, limit: 10 });
+            
+            // Ищем среди результатов тот, который начинается с нашего никнейма
+            for (const [memberId, memberData] of searchResults) {
+              const displayName = memberData.displayName || memberData.user.username;
+              if (displayName.startsWith(nick + ' (')) {
+                member = searchResults;
+                break;
+              }
+            }
+          }
+          
+          if (member.size > 0) {
+            const userId = member.first()?.id;
+            if (userId) {
+              nickToUserId.set(normalize(nick), userId);
+              logStats(`Найден Discord ID для ${nick}: ${userId}`);
+            }
+          }
+        } catch (e) {
+          // Игнорируем ошибки поиска
+        }
+      }
+    }
+  }
+  
+  let addedCount = 0;
   for (const m of members) {
     if (m.points >= 1600) {
       const userId = nickToUserId.get(normalize(m.nick));
-      if (userId) achievers.add(userId);
+      if (userId) {
+        const wasAdded = achievers.has(userId);
+        achievers.add(userId);
+        if (!wasAdded) {
+          addedCount++;
+          logStats(`Добавлено достижение для ${m.nick} (${m.points} ЛПР)`);
+        }
+      } else {
+        logStats(`Не удалось найти userId для ${m.nick} (${m.points} ЛПР) - игрок не в Discord сервере`);
+      }
     }
   }
+  
   saveAchievers(achievers);
-  logStats(`Обновлены достижения: ${achievers.size} игроков с 1600+ ЛПР`);
+  logStats(`Обновлены достижения: ${achievers.size} игроков с 1600+ ЛПР (добавлено новых: ${addedCount})`);
 }
 
 async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserData>) {
@@ -484,25 +540,12 @@ async function statsScheduler(client: Client) {
                                    (mskHour < 16 || (mskHour === 16 && minute < 50));
   
   if (shouldCollectMissedStats) {
-    // Проверяем, есть ли уже данные за сегодняшнее 01:20
-    try {
-      const existingData = loadCurrentMembers();
-      const today = new Date().toISOString().slice(0, 10);
-      
-      // Проверяем дату последней модификации файла данных
-      const fs = require('fs');
-      const path = require('path');
-      const dataFilePath = path.join(__dirname, "..", "data", "members_current.json");
-      
-      let shouldCollect = existingData.length === 0;
-      if (!shouldCollect && fs.existsSync(dataFilePath)) {
-        const fileStats = fs.statSync(dataFilePath);
-        const fileDate = fileStats.mtime.toISOString().slice(0, 10);
-        shouldCollect = fileDate !== today;
-      }
-      
-      if (shouldCollect) {
-        logStats("Обнаружено пропущенное время сбора статистики 01:20, выполняем сбор сейчас");
+    // Проверяем, был ли уже сбор статистики 01:20 сегодня
+    const today = new Date().toISOString().slice(0, 10);
+    const wasAlreadyCollected = wasStatsCollectionCompleted(today, "01:20", "stats");
+    
+    if (!wasAlreadyCollected) {
+      logStats("Обнаружено пропущенное время сбора статистики 01:20, выполняем сбор сейчас");
         
         try {
           const members = await fetchClanPoints("ALLIANCE");
@@ -589,6 +632,11 @@ async function statsScheduler(client: Client) {
               await handleSeasonEndRewards(guild, users);
             }
           }
+          
+          // Отмечаем, что сбор статистики 01:20 выполнен
+          markStatsCollectionCompleted("01:20", "stats");
+          logStats("Сбор статистики 01:20 отмечен как выполненный");
+          
         } catch (error: any) {
           logStats(`❌ Ошибка при пропущенном сборе статистики: ${error.message}`);
           
@@ -630,7 +678,11 @@ async function statsScheduler(client: Client) {
     // Обновляем достижения
     const members = loadCurrentMembers();
     const users = loadJson<Record<string, UserData>>(usersPath);
-    await updateAchievers(users, members);
+    await updateAchievers(client, users, members);
+    
+    // Отмечаем, что синхронизация 16:50 выполнена
+    markStatsCollectionCompleted("16:50", "sync");
+    logStats("Синхронизация 16:50 отмечена как выполненная");
   } else if (mskHour === 1 && minute === 20) {
     logStats("Сбор состояния участников и отправка статистики (01:20)");
     
@@ -720,6 +772,10 @@ async function statsScheduler(client: Client) {
           await handleSeasonEndRewards(guild, users);
         }
       }
+      
+      // Отмечаем, что сбор статистики 01:20 выполнен
+      markStatsCollectionCompleted("01:20", "stats");
+      logStats("Сбор статистики 01:20 отмечен как выполненный");
     } catch (error: any) {
       logStats(`❌ Ошибка при сборе статистики: ${error.message}`);
       
@@ -788,29 +844,20 @@ async function syncclanScheduler(client: Client) {
   const shouldSyncMissed = (mskHour > 16 || (mskHour === 16 && minute > 50));
   
   if (shouldSyncMissed) {
-    // Проверяем, была ли уже синхронизация сегодня
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const membersFilePath = path.join(__dirname, "..", "data", "members_current.json");
+    // Проверяем, была ли уже синхронизация 16:50 сегодня
+    const today = new Date().toISOString().slice(0, 10);
+    const wasAlreadySynced = wasStatsCollectionCompleted(today, "16:50", "sync");
+    
+    if (!wasAlreadySynced) {
+      logSyncclan("Обнаружено пропущенное время синхронизации 16:50, выполняем синхронизацию сейчас");
       
-      let shouldSync = false;
-      const today = new Date().toISOString().slice(0, 10);
+      // Выполняем полную синхронизацию используя ту же функцию
+      await performFullClanSync(client);
       
-      if (fs.existsSync(membersFilePath)) {
-        const fileStats = fs.statSync(membersFilePath);
-        const fileDate = fileStats.mtime.toISOString().slice(0, 10);
-        shouldSync = fileDate !== today;
-      } else {
-        shouldSync = true; // Файл не существует, нужна синхронизация
-      }
-      
-      if (shouldSync) {
-        logSyncclan("Обнаружено пропущенное время синхронизации 16:50, выполняем синхронизацию сейчас");
-        
-        // Выполняем полную синхронизацию используя ту же функцию
-        await performFullClanSync(client);
-      }
+      // Отмечаем, что синхронизация 16:50 выполнена
+      markStatsCollectionCompleted("16:50", "sync");
+      logSyncclan("Синхронизация 16:50 отмечена как выполненная");
+    }
     } catch (error) {
       logSyncclan(`Ошибка при проверке пропущенной синхронизации: ${error}`);
     }
