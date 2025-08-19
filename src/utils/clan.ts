@@ -9,40 +9,78 @@ const statePath = path.join(__dirname, "..", "data", "members_state.json");
 const leaversTrackingPath = path.join(__dirname, "..", "data", "leavers_tracking.json");
 
 export async function fetchClanPoints(
-  clanTag: string
+  clanTag: string,
+  retryCount: number = 0
 ): Promise<{ nick: string; points: number }[]> {
+  const maxRetries = 3;
   const url = `https://warthunder.com/ru/community/claninfo/${encodeURIComponent(
     clanTag
   )}`;
-  console.log(`🌐 Загружаем страницу клана: ${clanTag}`);
-  const { data: html } = await axios.get(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36",
-    },
-  });
-  console.log(`📄 Длина HTML: ${html.length}`);
+  
+  try {
+    console.log(`🌐 Загружаем страницу клана: ${clanTag}${retryCount > 0 ? ` (попытка ${retryCount + 1})` : ''}`);
+    
+    // Более реалистичные браузерные заголовки
+    const { data: html } = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
+        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"'
+      },
+      timeout: 30000, // 30 секунд таймаут
+      maxRedirects: 5
+    });
+    
+    console.log(`📄 Длина HTML: ${html.length}`);
 
-  const $ = cheerio.load(html);
-  const members: { nick: string; points: number }[] = [];
-  const items = $(".squadrons-members__grid-item");
+    const $ = cheerio.load(html);
+    const members: { nick: string; points: number }[] = [];
+    const items = $(".squadrons-members__grid-item");
 
-  for (let i = 0; i < items.length; i += 6) {
-    const nick = $(items[i + 1])
-      .text()
-      .trim();
-    const pointsText = $(items[i + 2])
-      .text()
-      .trim()
-      .replace(/\s/g, "");
-    const points = parseInt(pointsText, 10);
+    for (let i = 0; i < items.length; i += 6) {
+      const nick = $(items[i + 1])
+        .text()
+        .trim();
+      const pointsText = $(items[i + 2])
+        .text()
+        .trim()
+        .replace(/\s/g, "");
+      const points = parseInt(pointsText, 10);
 
-    if (nick && !isNaN(points)) {
-      members.push({ nick, points });
+      if (nick && !isNaN(points)) {
+        members.push({ nick, points });
+      }
     }
-  }
 
-  return members;
+    console.log(`✅ Успешно получено ${members.length} участников клана`);
+    return members;
+    
+  } catch (error: any) {
+    console.error(`❌ Ошибка при загрузке клана ${clanTag}:`, error.message);
+    
+    // Если это ошибка 403 и есть еще попытки, пробуем снова
+    if (error.response?.status === 403 && retryCount < maxRetries) {
+      const delay = Math.pow(2, retryCount) * 1000; // Экспоненциальная задержка: 1с, 2с, 4с
+      console.log(`⏳ Повторная попытка через ${delay}мс...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchClanPoints(clanTag, retryCount + 1);
+    }
+    
+    // Если все попытки исчерпаны или другая ошибка, выбрасываем исключение
+    throw new Error(`Не удалось загрузить данные клана ${clanTag} после ${retryCount + 1} попыток: ${error.message}`);
+  }
 }
 
 function getActiveFile(): "a" | "b" {

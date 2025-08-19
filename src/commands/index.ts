@@ -9,11 +9,14 @@ import { resourcesCommand } from "./resources";
 import { syncclanCommand } from "./syncclan";
 import { resettleaversCommand } from "./resettleavers";
 import { teststatsCommand } from "./teststats";
+import { statsCommand } from "./stats";
+import { checktrackedCommand } from "./checktracked";
 import { simpleTestCommand } from "./simple-test";
 import { lichstatCommand } from "./lichstat";
 import { runtestsCommand } from "./runtests";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error } from "../utils/logger";
+import { checkPermission } from "../utils/permissions";
 
 export {
   helpCommand,
@@ -26,6 +29,8 @@ export {
   syncclanCommand,
   resettleaversCommand,
   teststatsCommand,
+  statsCommand,
+  checktrackedCommand,
   lichstatCommand,
   runtestsCommand,
 };
@@ -116,6 +121,12 @@ export function setupCommands(client: Client) {
           guildId: interaction.guildId 
         });
 
+        // Проверяем разрешения пользователя
+        const hasAccess = await checkPermission(interaction);
+        if (!hasAccess) {
+          return;
+        }
+
         switch (commandName) {
           case "help":
             await helpCommand(interaction);
@@ -146,6 +157,12 @@ export function setupCommands(client: Client) {
             break;
           case "teststats":
             await teststatsCommand(interaction);
+            break;
+          case "stats":
+            await statsCommand(interaction);
+            break;
+          case "checktracked":
+            await checktrackedCommand(interaction);
             break;
           case "lichstat":
             await lichstatCommand(interaction);

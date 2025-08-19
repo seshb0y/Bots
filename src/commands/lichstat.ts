@@ -7,20 +7,36 @@ interface ThunderSkillStats {
     rank: string;
     last_stat: string;
     r: {
-      kpd: number;
-      win: number;
-      mission: number;
-      death: number;
-      winrate: number;
-      kb: number;
-      kb_air: number;
-      kb_ground: number;
-      kd: number;
-      kd_air: number;
-      kd_ground: number;
-      lifetime: number;
+      kpd: number | null;
+      win: number | null;
+      mission: number | null;
+      death: number | null;
+      winrate: number | null;
+      kb: number | null;
+      kb_air: number | null;
+      kb_ground: number | null;
+      kd: number | null;
+      kd_air: number | null;
+      kd_ground: number | null;
+      lifetime: number | null;
     };
   };
+}
+
+// Функция для безопасного форматирования чисел
+function safeToFixed(value: number | null, decimals: number = 2): string {
+  if (value === null || value === undefined) {
+    return "N/A";
+  }
+  return value.toFixed(decimals);
+}
+
+// Функция для безопасного отображения чисел
+function safeNumber(value: number | null): string {
+  if (value === null || value === undefined) {
+    return "N/A";
+  }
+  return value.toString();
 }
 
 export async function lichstatCommand(interaction: ChatInputCommandInteraction) {
@@ -76,62 +92,62 @@ export async function lichstatCommand(interaction: ChatInputCommandInteraction) 
       .addFields(
         { 
           name: "🎯 КПД (Эффективность)", 
-          value: `${rbStats.kpd.toFixed(2)}%`, 
+          value: `${safeToFixed(rbStats.kpd)}%`, 
           inline: true 
         },
         { 
           name: "🏆 Процент побед", 
-          value: `${rbStats.winrate.toFixed(2)}%`, 
+          value: `${safeToFixed(rbStats.winrate)}%`, 
           inline: true 
         },
         { 
           name: "⚔️ Боев", 
-          value: `${rbStats.mission}`, 
+          value: safeNumber(rbStats.mission), 
           inline: true 
         },
         { 
           name: "💀 Смертей", 
-          value: `${rbStats.death}`, 
+          value: safeNumber(rbStats.death), 
           inline: true 
         },
         { 
           name: "🎖️ Побед", 
-          value: `${rbStats.win}`, 
+          value: safeNumber(rbStats.win), 
           inline: true 
         },
         { 
           name: "⏱️ Время жизни", 
-          value: `${rbStats.lifetime} мин`, 
+          value: rbStats.lifetime ? `${rbStats.lifetime} мин` : "N/A", 
           inline: true 
         },
         { 
           name: "🔫 K/D (Убийства/Смерти)", 
-          value: `${rbStats.kd.toFixed(2)}`, 
+          value: safeToFixed(rbStats.kd), 
           inline: true 
         },
         { 
           name: "✈️ K/D воздушные", 
-          value: `${rbStats.kd_air.toFixed(2)}`, 
+          value: safeToFixed(rbStats.kd_air), 
           inline: true 
         },
         { 
           name: "🛡️ K/D наземные", 
-          value: `${rbStats.kd_ground.toFixed(2)}`, 
+          value: safeToFixed(rbStats.kd_ground), 
           inline: true 
         },
         { 
           name: "💥 K/B (Убийства/Бой)", 
-          value: `${rbStats.kb.toFixed(2)}`, 
+          value: safeToFixed(rbStats.kb), 
           inline: true 
         },
         { 
           name: "✈️ K/B воздушные", 
-          value: `${rbStats.kb_air.toFixed(2)}`, 
+          value: safeToFixed(rbStats.kb_air), 
           inline: true 
         },
         { 
           name: "🛡️ K/B наземные", 
-          value: `${rbStats.kb_ground.toFixed(2)}`, 
+          value: safeToFixed(rbStats.kb_ground), 
           inline: true 
         }
       )

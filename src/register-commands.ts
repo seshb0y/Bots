@@ -1,4 +1,4 @@
-import { REST, Routes, SlashCommandBuilder } from "discord.js";
+import { REST, Routes, SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import "dotenv/config";
 
 const commands = [
@@ -8,10 +8,12 @@ const commands = [
   new SlashCommandBuilder().setName("ping").setDescription("Проверка бота"),
   new SlashCommandBuilder()
     .setName("points")
-    .setDescription("Посмотреть свои очки"),
+    .setDescription("Посмотреть свои очки")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder()
     .setName("addtracer")
     .setDescription("Добавить игрока в отслеживание")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addStringOption((option) =>
       option
         .setName("nickname")
@@ -21,6 +23,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName("removetracer")
     .setDescription("Удалить игрока из отслеживания")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addStringOption((option) =>
       option
         .setName("nickname")
@@ -29,10 +32,12 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName("listtraced")
-    .setDescription("Список отслеживаемых игроков"),
+    .setDescription("Список отслеживаемых игроков")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder()
     .setName("syncclan")
     .setDescription("Синхронизировать очки участников по клану")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption((option) =>
       option
         .setName("clan")
@@ -41,13 +46,16 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName("resettleavers")
-    .setDescription("Сбросить файл отслеживания покинувших игроков"),
+    .setDescription("Сбросить файл отслеживания покинувших игроков")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("pbnotify")
-    .setDescription("Manually send PB notification to officers"),
+    .setDescription("Manually send PB notification to officers")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("resources")
     .setDescription("Show current CPU and memory usage of the bot")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption((option) =>
       option
         .setName("option")
@@ -62,16 +70,20 @@ const commands = [
     .setName("checktracked")
     .setDescription(
       "Manually check tracked players and notify officers if needed"
-    ),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("stats")
-    .setDescription("Показать статистику изменений очков за сутки по игрокам"),
+    .setDescription("Показать статистику изменений очков за сутки по игрокам")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder()
     .setName("teststats")
-    .setDescription("Тестовая команда для проверки статистики с лидербордом"),
+    .setDescription("Тестовая команда для проверки статистики с лидербордом")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("simpletest")
-    .setDescription("Простая тестовая команда"),
+    .setDescription("Простая тестовая команда")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   new SlashCommandBuilder()
     .setName("lichstat")
     .setDescription("Получить статистику игрока War Thunder")
@@ -84,7 +96,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName("runtests")
     .setDescription("Запустить тестирование бота (только для администраторов)")
-    .setDefaultMemberPermissions(0),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

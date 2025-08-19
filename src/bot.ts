@@ -290,7 +290,7 @@ const SERVICE_ROLES = [
 ];
 const HONOR_ROLE = "1217444648591687700";
 
-const ACHIEVERS_PATH = path.join(__dirname, "..", "..", "data", "season_achievers.json");
+const ACHIEVERS_PATH = path.join(__dirname, "..", "data", "season_achievers.json");
 
 function loadAchievers(): Set<string> {
   if (!fs.existsSync(ACHIEVERS_PATH)) return new Set();
@@ -492,7 +492,7 @@ async function statsScheduler(client: Client) {
       // Проверяем дату последней модификации файла данных
       const fs = require('fs');
       const path = require('path');
-      const dataFilePath = path.join(__dirname, "..", "..", "data", "members_current.json");
+      const dataFilePath = path.join(__dirname, "..", "data", "members_current.json");
       
       let shouldCollect = existingData.length === 0;
       if (!shouldCollect && fs.existsSync(dataFilePath)) {
@@ -504,89 +504,102 @@ async function statsScheduler(client: Client) {
       if (shouldCollect) {
         logStats("Обнаружено пропущенное время сбора статистики 01:20, выполняем сбор сейчас");
         
-        const members = await fetchClanPoints("ALLIANCE");
-        
-        // Получаем предыдущие данные из основного файла
-        const prev = loadCurrentMembers();
-        
-        // Получаем текущую информацию о лидерборде
-        logStats("Получение текущей информации о лидерборде...");
-        let currentLeaderboardInfo = null;
         try {
-          currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
-          if (currentLeaderboardInfo) {
-            logStats(`Получена информация о лидерборде: место ${currentLeaderboardInfo.position}, очки ${currentLeaderboardInfo.points}`);
+          const members = await fetchClanPoints("ALLIANCE");
+          
+          // Получаем предыдущие данные из основного файла
+          const prev = loadCurrentMembers();
+          
+          // Получаем текущую информацию о лидерборде
+          logStats("Получение текущей информации о лидерборде...");
+          let currentLeaderboardInfo = null;
+          try {
+            currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+            if (currentLeaderboardInfo) {
+              logStats(`Получена информация о лидерборде: место ${currentLeaderboardInfo.position}, очки ${currentLeaderboardInfo.points}`);
+            } else {
+              logStats("Полк ALLIANCE не найден в лидерборде");
+            }
+          } catch (error) {
+            logStats(`Ошибка при получении информации о лидерборде: ${error}`);
+          }
+          const previousLeaderboardData = loadLeaderboardData();
+          
+          // Сравнить и отправить статистику
+          const { totalDelta, changes } = compareMembersData(prev, members);
+          
+          let msg = `📊 **Статистика за сутки (пропущенный сбор):**\n`;
+          
+          // Добавляем информацию о лидерборде
+          if (currentLeaderboardInfo && previousLeaderboardData) {
+            const comparison = compareLeaderboardData(currentLeaderboardInfo, previousLeaderboardData);
+            
+            msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+            
+            if (comparison.positionDirection === "up") {
+              msg += `📈 Поднялись на ${comparison.positionChange} мест\n`;
+            } else if (comparison.positionDirection === "down") {
+              msg += `📉 Опустились на ${comparison.positionChange} мест\n`;
+            } else {
+              msg += `➡️ Место не изменилось\n`;
+            }
+            
+            msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n`;
+            
+            if (comparison.pointsDirection === "up") {
+              msg += `📈 Получили ${comparison.pointsChange.toLocaleString()} очков\n`;
+            } else if (comparison.pointsDirection === "down") {
+              msg += `📉 Потеряли ${comparison.pointsChange.toLocaleString()} очков\n`;
+            } else {
+              msg += `➡️ Очки не изменились\n`;
+            }
+            
+            msg += `\n`;
+          } else if (currentLeaderboardInfo) {
+            msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+            msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n\n`;
+          }
+        
+          
+          if (changes.length > 0) {
+            msg += `\nИзменения по игрокам:\n`;
+            for (const { nick, delta } of changes.sort((a, b) => b.delta - a.delta)) {
+              msg += `• ${nick}: ${delta >= 0 ? "+" : ""}${delta}\n`;
+            }
           } else {
-            logStats("Полк ALLIANCE не найден в лидерборде");
-          }
-        } catch (error) {
-          logStats(`Ошибка при получении информации о лидерборде: ${error}`);
-        }
-        const previousLeaderboardData = loadLeaderboardData();
-        
-        // Сравнить и отправить статистику
-        const { totalDelta, changes } = compareMembersData(prev, members);
-        
-        let msg = `📊 **Статистика за сутки (пропущенный сбор):**\n`;
-        
-        // Добавляем информацию о лидерборде
-        if (currentLeaderboardInfo && previousLeaderboardData) {
-          const comparison = compareLeaderboardData(currentLeaderboardInfo, previousLeaderboardData);
-          
-          msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
-          
-          if (comparison.positionDirection === "up") {
-            msg += `📈 Поднялись на ${comparison.positionChange} мест\n`;
-          } else if (comparison.positionDirection === "down") {
-            msg += `📉 Опустились на ${comparison.positionChange} мест\n`;
-          } else {
-            msg += `➡️ Место не изменилось\n`;
+            msg += `\nЗа сутки не было изменений очков ни у одного игрока.\n`;
           }
           
-          msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n`;
-          
-          if (comparison.pointsDirection === "up") {
-            msg += `📈 Получили ${comparison.pointsChange.toLocaleString()} очков\n`;
-          } else if (comparison.pointsDirection === "down") {
-            msg += `📉 Потеряли ${comparison.pointsChange.toLocaleString()} очков\n`;
-          } else {
-            msg += `➡️ Очки не изменились\n`;
+          const channel = await client.channels.fetch(STATS_CHANNEL_ID);
+          if (channel && channel.isTextBased()) {
+            await (channel as TextChannel).send(msg);
+            logStats("Статистика отправлена в канал (пропущенный сбор)");
           }
           
-          msg += `\n`;
-        } else if (currentLeaderboardInfo) {
-          msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
-          msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n\n`;
-        }
-        
-        msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;
-        
-        if (changes.length > 0) {
-          msg += `\nИзменения по игрокам:\n`;
-          for (const { nick, delta } of changes.sort((a, b) => b.delta - a.delta)) {
-            msg += `• ${nick}: ${delta >= 0 ? "+" : ""}${delta}\n`;
+          // Сохраняем новые данные в основной файл
+          saveCurrentMembers(members);
+          logStats("Обновлен основной файл участников новыми данными (пропущенный сбор)");
+          
+          // Проверка конца сезона: все points = 0
+          if (members.every(p => p.points === 0)) {
+            logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
+            const users = loadJson<Record<string, UserData>>(usersPath);
+            const guild = client.guilds.cache.first();
+            if (guild) {
+              await handleSeasonEndRewards(guild, users);
+            }
           }
-        } else {
-          msg += `\nЗа сутки не было изменений очков ни у одного игрока.\n`;
-        }
-        
-        const channel = await client.channels.fetch(STATS_CHANNEL_ID);
-        if (channel && channel.isTextBased()) {
-          await (channel as TextChannel).send(msg);
-          logStats("Статистика отправлена в канал (пропущенный сбор)");
-        }
-        
-        // Сохраняем новые данные в основной файл
-        saveCurrentMembers(members);
-        logStats("Обновлен основной файл участников новыми данными (пропущенный сбор)");
-        
-        // Проверка конца сезона: все points = 0
-        if (members.every(p => p.points === 0)) {
-          logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
-          const users = loadJson<Record<string, UserData>>(usersPath);
-          const guild = client.guilds.cache.first();
-          if (guild) {
-            await handleSeasonEndRewards(guild, users);
+        } catch (error: any) {
+          logStats(`❌ Ошибка при пропущенном сборе статистики: ${error.message}`);
+          
+          // Отправляем уведомление об ошибке в канал статистики
+          try {
+            const channel = await client.channels.fetch(STATS_CHANNEL_ID);
+            if (channel && channel.isTextBased()) {
+              await (channel as TextChannel).send(`⚠️ **Ошибка пропущенного сбора статистики:** ${error.message}\n\nПопробуйте запустить команду /syncclan вручную.`);
+            }
+          } catch (channelError) {
+            logStats(`Не удалось отправить уведомление об ошибке: ${channelError}`);
           }
         }
       }
@@ -620,89 +633,104 @@ async function statsScheduler(client: Client) {
     await updateAchievers(users, members);
   } else if (mskHour === 1 && minute === 20) {
     logStats("Сбор состояния участников и отправка статистики (01:20)");
-    const members = await fetchClanPoints("ALLIANCE");
     
-    // Получаем предыдущие данные из основного файла
-    const prev = loadCurrentMembers();
-    
-    // Получаем текущую информацию о лидерборде
-    logStats("Получение текущей информации о лидерборде...");
-    let currentLeaderboardInfo = null;
     try {
-      currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
-      if (currentLeaderboardInfo) {
-        logStats(`Получена информация о лидерборде: место ${currentLeaderboardInfo.position}, очки ${currentLeaderboardInfo.points}`);
+      const members = await fetchClanPoints("ALLIANCE");
+      
+      // Получаем предыдущие данные из основного файла
+      const prev = loadCurrentMembers();
+      
+      // Получаем текущую информацию о лидерборде
+      logStats("Получение текущей информации о лидерборде...");
+      let currentLeaderboardInfo = null;
+      try {
+        currentLeaderboardInfo = await fetchClanLeaderboardInfo("ALLIANCE");
+        if (currentLeaderboardInfo) {
+          logStats(`Получена информация о лидерборде: место ${currentLeaderboardInfo.position}, очки ${currentLeaderboardInfo.points}`);
+        } else {
+          logStats("Полк ALLIANCE не найден в лидерборде");
+        }
+      } catch (error) {
+        logStats(`Ошибка при получении информации о лидерборде: ${error}`);
+      }
+      const previousLeaderboardData = loadLeaderboardData();
+      
+      // Сравнить и отправить статистику
+      const { totalDelta, changes } = compareMembersData(prev, members);
+      
+      let msg = `\uD83D\uDCCA **Статистика за сутки:**\n`;
+      
+      // Добавляем информацию о лидерборде
+      if (currentLeaderboardInfo && previousLeaderboardData) {
+        const comparison = compareLeaderboardData(currentLeaderboardInfo, previousLeaderboardData);
+        
+        msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+        
+        if (comparison.positionDirection === "up") {
+          msg += `📈 Поднялись на ${comparison.positionChange} мест\n`;
+        } else if (comparison.positionDirection === "down") {
+          msg += `📉 Опустились на ${comparison.positionChange} мест\n`;
+        } else {
+          msg += `➡️ Место не изменилось\n`;
+        }
+        
+        msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n`;
+        
+        if (comparison.pointsDirection === "up") {
+          msg += `📈 Получили ${comparison.pointsChange.toLocaleString()} очков\n`;
+        } else if (comparison.pointsDirection === "down") {
+          msg += `📉 Потеряли ${comparison.pointsChange.toLocaleString()} очков\n`;
+        } else {
+          msg += `➡️ Очки не изменились\n`;
+        }
+        
+        msg += `\n`;
+      } else if (currentLeaderboardInfo) {
+        msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
+        msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n\n`;
+      }
+      
+      msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;
+      
+      if (changes.length > 0) {
+        msg += `\nИзменения по игрокам:\n`;
+        for (const { nick, delta } of changes.sort((a, b) => b.delta - a.delta)) {
+          msg += `• ${nick}: ${delta >= 0 ? "+" : ""}${delta}\n`;
+        }
       } else {
-        logStats("Полк ALLIANCE не найден в лидерборде");
-      }
-    } catch (error) {
-      logStats(`Ошибка при получении информации о лидерборде: ${error}`);
-    }
-    const previousLeaderboardData = loadLeaderboardData();
-    
-    // Сравнить и отправить статистику
-    const { totalDelta, changes } = compareMembersData(prev, members);
-    
-    let msg = `\uD83D\uDCCA **Статистика за сутки:**\n`;
-    
-    // Добавляем информацию о лидерборде
-    if (currentLeaderboardInfo && previousLeaderboardData) {
-      const comparison = compareLeaderboardData(currentLeaderboardInfo, previousLeaderboardData);
-      
-      msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
-      
-      if (comparison.positionDirection === "up") {
-        msg += `📈 Поднялись на ${comparison.positionChange} мест\n`;
-      } else if (comparison.positionDirection === "down") {
-        msg += `📉 Опустились на ${comparison.positionChange} мест\n`;
-      } else {
-        msg += `➡️ Место не изменилось\n`;
+        msg += `\nЗа сутки не было изменений очков ни у одного игрока.\n`;
       }
       
-      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n`;
-      
-      if (comparison.pointsDirection === "up") {
-        msg += `📈 Получили ${comparison.pointsChange.toLocaleString()} очков\n`;
-      } else if (comparison.pointsDirection === "down") {
-        msg += `📉 Потеряли ${comparison.pointsChange.toLocaleString()} очков\n`;
-      } else {
-        msg += `➡️ Очки не изменились\n`;
+      const channel = await client.channels.fetch(STATS_CHANNEL_ID);
+      if (channel && channel.isTextBased()) {
+        await (channel as TextChannel).send(msg);
+        logStats("Статистика отправлена в канал");
       }
       
-      msg += `\n`;
-    } else if (currentLeaderboardInfo) {
-      msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
-      msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n\n`;
-    }
-    
-    msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;
-    
-    if (changes.length > 0) {
-      msg += `\nИзменения по игрокам:\n`;
-      for (const { nick, delta } of changes.sort((a, b) => b.delta - a.delta)) {
-        msg += `• ${nick}: ${delta >= 0 ? "+" : ""}${delta}\n`;
+      // Сохраняем новые данные в основной файл
+      saveCurrentMembers(members);
+      logStats("Обновлен основной файл участников новыми данными");
+      
+      // Проверка конца сезона: все points = 0
+      if (members.every(p => p.points === 0)) {
+        logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
+        const users = loadJson<Record<string, UserData>>(usersPath);
+        const guild = client.guilds.cache.first();
+        if (guild) {
+          await handleSeasonEndRewards(guild, users);
+        }
       }
-    } else {
-      msg += `\nЗа сутки не было изменений очков ни у одного игрока.\n`;
-    }
-    
-    const channel = await client.channels.fetch(STATS_CHANNEL_ID);
-    if (channel && channel.isTextBased()) {
-      await (channel as TextChannel).send(msg);
-      logStats("Статистика отправлена в канал");
-    }
-    
-    // Сохраняем новые данные в основной файл
-    saveCurrentMembers(members);
-    logStats("Обновлен основной файл участников новыми данными");
-    
-    // Проверка конца сезона: все points = 0
-    if (members.every(p => p.points === 0)) {
-      logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
-      const users = loadJson<Record<string, UserData>>(usersPath);
-      const guild = client.guilds.cache.first();
-      if (guild) {
-        await handleSeasonEndRewards(guild, users);
+    } catch (error: any) {
+      logStats(`❌ Ошибка при сборе статистики: ${error.message}`);
+      
+      // Отправляем уведомление об ошибке в канал статистики
+      try {
+        const channel = await client.channels.fetch(STATS_CHANNEL_ID);
+        if (channel && channel.isTextBased()) {
+          await (channel as TextChannel).send(`⚠️ **Ошибка сбора статистики:** ${error.message}\n\nПопробуйте запустить команду /syncclan вручную.`);
+        }
+      } catch (channelError) {
+        logStats(`Не удалось отправить уведомление об ошибке: ${channelError}`);
       }
     }
   } else {
@@ -764,7 +792,7 @@ async function syncclanScheduler(client: Client) {
     try {
       const fs = require('fs');
       const path = require('path');
-      const membersFilePath = path.join(__dirname, "..", "..", "data", "members_current.json");
+      const membersFilePath = path.join(__dirname, "..", "data", "members_current.json");
       
       let shouldSync = false;
       const today = new Date().toISOString().slice(0, 10);
