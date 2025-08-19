@@ -37,7 +37,7 @@ export async function fetchClanLeaderboardInfo(clanName: string): Promise<ClanLe
     
     while (page <= maxPages) {
       try {
-        const url = `https://warthunder.com/ru/community/clansleaderboard/page/${page}/?type=hist&sort=ftime`;
+        const url = `https://warthunder.com/ru/community/clansleaderboard/page/${page}/?type=hist`;
         console.log(`📄 Проверяем страницу ${page}: ${url}`);
         
         // Переходим на страницу и ждем загрузки
