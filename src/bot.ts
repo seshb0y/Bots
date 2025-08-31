@@ -623,7 +623,15 @@ async function statsScheduler(client: Client) {
         logStats("Обновлен основной файл участников новыми данными (пропущенный сбор)");
         
         // Проверка конца сезона: все points = 0
-        if (members.every(p => p.points === 0)) {
+        logStats(`Проверка конца сезона (пропущенный сбор): получено ${members.length} участников`);
+        if (members.length > 0) {
+          const zeroPointsCount = members.filter(p => p.points === 0).length;
+          const totalPoints = members.reduce((sum, p) => sum + p.points, 0);
+          logStats(`Участников с 0 очками: ${zeroPointsCount}/${members.length}, общая сумма очков: ${totalPoints}`);
+        }
+        
+        // Проверка конца сезона: все points = 0
+        if (members.length > 0 && members.every(p => p.points === 0)) {
           logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
           const users = loadJson<Record<string, UserData>>(usersPath);
           const guild = client.guilds.cache.first();
@@ -760,7 +768,15 @@ async function statsScheduler(client: Client) {
       logStats("Обновлен основной файл участников новыми данными");
       
       // Проверка конца сезона: все points = 0
-      if (members.every(p => p.points === 0)) {
+      logStats(`Проверка конца сезона: получено ${members.length} участников`);
+      if (members.length > 0) {
+        const zeroPointsCount = members.filter(p => p.points === 0).length;
+        const totalPoints = members.reduce((sum, p) => sum + p.points, 0);
+        logStats(`Участников с 0 очками: ${zeroPointsCount}/${members.length}, общая сумма очков: ${totalPoints}`);
+      }
+      
+      // Проверка конца сезона: все points = 0
+      if (members.length > 0 && members.every(p => p.points === 0)) {
         logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
         const users = loadJson<Record<string, UserData>>(usersPath);
         const guild = client.guilds.cache.first();

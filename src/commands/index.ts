@@ -14,6 +14,7 @@ import { checktrackedCommand } from "./checktracked";
 import { simpleTestCommand } from "./simple-test";
 import { lichstatCommand } from "./lichstat";
 import { runtestsCommand } from "./runtests";
+import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal } from "./flight-academy";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error } from "../utils/logger";
 import { checkPermission } from "../utils/permissions";
@@ -40,6 +41,16 @@ export function setupCommands(client: Client) {
     try {
       // --- обработка кнопок ---
       if (interaction.isButton()) {
+        // Обработка кнопок лётной академии
+        if (interaction.customId.startsWith("type_") || 
+            interaction.customId.startsWith("license_") || 
+            interaction.customId.startsWith("training_") || 
+            interaction.customId.startsWith("close_ticket_") ||
+            interaction.customId === "back_to_main") {
+          await flightAcademyButton(interaction);
+          return;
+        }
+        
         if (interaction.customId === "pb_yes") {
           logInteraction("Нажата кнопка 'Собираю' для ПБ", { userId: interaction.user.id, username: interaction.user.tag });
           
@@ -110,6 +121,12 @@ export function setupCommands(client: Client) {
           await interaction.reply({ content: "Оповещение о сборе ПБ отправлено в канал!", ephemeral: true });
           return;
         }
+        
+        // Обработка кнопок лётной академии
+        if (interaction.customId.startsWith("license_")) {
+          await flightAcademyButton(interaction);
+          return;
+        }
       }
 
       // --- обработка команд ---
@@ -170,6 +187,9 @@ export function setupCommands(client: Client) {
           case "runtests":
             await runtestsCommand(interaction);
             break;
+          case "flight-academy":
+            await flightAcademyCommand(interaction);
+            break;
           case "ping":
             await interaction.reply({ content: "🏓 Понг! Бот работает.", ephemeral: true });
             break;
@@ -182,6 +202,14 @@ export function setupCommands(client: Client) {
               username: interaction.user.tag 
             });
             await interaction.reply({ content: "Неизвестная команда!", ephemeral: true });
+        }
+      }
+      
+      // --- обработка модальных окон ---
+      if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith("academy_form_") || interaction.customId.startsWith("training_form_")) {
+          await flightAcademyModal(interaction);
+          return;
         }
       }
     } catch (err: any) {

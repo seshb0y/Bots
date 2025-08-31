@@ -97,6 +97,10 @@ const commands = [
     .setName("runtests")
     .setDescription("Запустить тестирование бота (только для администраторов)")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder()
+    .setName("flight-academy")
+    .setDescription("Создать тикет для лётной академии War Thunder")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

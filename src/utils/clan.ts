@@ -13,109 +13,126 @@ export async function fetchClanPoints(
   retryCount: number = 0
 ): Promise<{ nick: string; points: number }[]> {
   const maxRetries = 3;
-  let currentPage = 3; // Начинаем с 3-й страницы
-  const maxPages = 6; // Максимальное количество страниц для поиска
   
-  while (currentPage <= maxPages) {
-    const url = `https://warthunder.com/ru/community/clansleaderboard/page/${currentPage}/?type=hist`;
+  try {
+    console.log(`🌐 Загружаем участников клана ${clanTag}${retryCount > 0 ? ` (попытка ${retryCount + 1})` : ''}`);
     
-    try {
-      console.log(`🌐 Загружаем страницу ${currentPage} лидерборда кланов${clanTag ? ` для клана: ${clanTag}` : ''}${retryCount > 0 ? ` (попытка ${retryCount + 1})` : ''}`);
-      
-      // Более реалистичные браузерные заголовки
-      const { data: html } = await axios.get(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-          "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-          "Accept-Encoding": "gzip, deflate, br",
-          "DNT": "1",
-          "Connection": "keep-alive",
-          "Upgrade-Insecure-Requests": "1",
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
-          "Sec-Fetch-User": "?1",
-          "Cache-Control": "max-age=0",
-          "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-          "Sec-Ch-Ua-Mobile": "?0",
-          "Sec-Ch-Ua-Platform": '"Windows"'
-        },
-        timeout: 30000, // 30 секунд таймаут
-        maxRedirects: 5
-      });
-      
-      console.log(`📄 Длина HTML: ${html.length}`);
+    // Правильный URL для получения информации о клане
+    const url = `https://warthunder.com/ru/community/claninfo/${clanTag}`;
+    
+    // Более реалистичные браузерные заголовки
+    const { data: html } = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
+        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"'
+      },
+      timeout: 30000, // 30 секунд таймаут
+      maxRedirects: 5
+    });
+    
+    console.log(`📄 Длина HTML: ${html.length}`);
 
-      const $ = cheerio.load(html);
-      const members: { nick: string; points: number }[] = [];
-      let foundTargetClan = false;
+    const $ = cheerio.load(html);
+    const members: { nick: string; points: number }[] = [];
+    
+    // Получаем все ссылки на профили игроков
+    const playerLinks = $('a[href*="/community/userinfo/"]');
+    
+    playerLinks.each((index, element) => {
+      const $link = $(element);
+      const nick = $link.text().trim();
       
-      // Ищем таблицу с кланами на странице лидерборда
-      const clanRows = $(".clans-leaderboard__row");
-      
-      clanRows.each((index, element) => {
-        const $row = $(element);
-        const clanName = $row.find(".clans-leaderboard__clan-name").text().trim();
-        const pointsText = $row.find(".clans-leaderboard__points").text().trim().replace(/\s/g, "");
-        const points = parseInt(pointsText, 10);
+      if (nick && nick.length > 1 && !nick.match(/^\d+$/)) {
+        // Ищем очки для этого игрока
+        // Очки находятся в следующей строке после никнейма
+        const $parent = $link.parent();
+        const $row = $parent.parent();
+        const $cells = $row.find('td');
         
-        // Если указан конкретный клан, фильтруем по нему
-        if (clanTag && clanName.toLowerCase().includes(clanTag.toLowerCase())) {
-          if (clanName && !isNaN(points)) {
-            members.push({ nick: clanName, points });
-            foundTargetClan = true;
-          }
-        } else if (!clanTag) {
-          // Если клан не указан, собираем все кланы
-          if (clanName && !isNaN(points)) {
-            members.push({ nick: clanName, points });
+        if ($cells.length >= 3) {
+          // Третий столбец содержит очки
+          const pointsText = $cells.eq(2).text().trim();
+          const points = parseInt(pointsText, 10);
+          
+          if (!isNaN(points)) {
+            members.push({ nick, points });
           }
         }
-      });
-
-      // Если ищем конкретный клан и нашли его, возвращаем результат
-      if (clanTag && foundTargetClan) {
-        console.log(`✅ Найден клан ${clanTag} на странице ${currentPage}`);
-        return members;
       }
+    });
+    
+    // Если не удалось получить данные через таблицу, используем текстовый парсинг
+    if (members.length === 0) {
+      console.log(`🔍 Альтернативный поиск участников...`);
       
-      // Если ищем конкретный клан, но не нашли на этой странице, переходим к следующей
-      if (clanTag && !foundTargetClan) {
-        console.log(`🔍 Клан ${clanTag} не найден на странице ${currentPage}, переходим к следующей...`);
-        currentPage++;
-        continue;
+      const allText = $.text();
+      const lines = allText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      
+      // Ищем паттерн: дата, номер, никнейм, очки, активность
+      for (let i = 0; i < lines.length - 4; i++) {
+        const dateLine = lines[i];
+        const numberLine = lines[i + 1];
+        const nickLine = lines[i + 2];
+        const pointsLine = lines[i + 3];
+        const activityLine = lines[i + 4];
+        
+        // Проверяем, что это правильный паттерн
+        if (dateLine.match(/^\d{2}\.\d{2}\.\d{4}$/) && // дата
+            numberLine.match(/^\d+$/) && // номер
+            nickLine.match(/^[A-Za-z0-9_\-\.]+$/) && // никнейм
+            pointsLine.match(/^\d+$/) && // очки
+            activityLine.match(/^\d+$/)) { // активность
+          
+          const nick = nickLine;
+          const points = parseInt(pointsLine, 10);
+          
+          if (points >= 0 && points < 10000) {
+            members.push({ nick, points });
+          }
+        }
       }
-      
-      // Если не ищем конкретный клан, возвращаем все найденные кланы
-      if (!clanTag) {
-        console.log(`✅ Успешно получено ${members.length} кланов с лидерборда (страница ${currentPage})`);
-        return members;
-      }
-      
-    } catch (error: any) {
-      console.error(`❌ Ошибка при загрузке лидерборда кланов${clanTag ? ` для клана ${clanTag}` : ''} на странице ${currentPage}:`, error.message);
-      
-      // Если это ошибка 403 и есть еще попытки, пробуем снова
-      if (error.response?.status === 403 && retryCount < maxRetries) {
-        const delay = Math.pow(2, retryCount) * 1000; // Экспоненциальная задержка: 1с, 2с, 4с
-        console.log(`⏳ Повторная попытка через ${delay}мс...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchClanPoints(clanTag, retryCount + 1);
-      }
-      
-      // Если все попытки исчерпаны или другая ошибка, выбрасываем исключение
-      throw new Error(`Не удалось загрузить данные лидерборда кланов${clanTag ? ` для клана ${clanTag}` : ''} на странице ${currentPage} после ${retryCount + 1} попыток: ${error.message}`);
     }
-  }
-  
-  // Если дошли до конца и не нашли клан
-  if (clanTag) {
-    console.log(`❌ Клан ${clanTag} не найден на всех проверенных страницах (с ${3} по ${maxPages})`);
+    
+    // Удаляем дубликаты
+    const uniqueMembers = members.filter((member, index, self) => 
+      index === self.findIndex(m => m.nick === member.nick)
+    );
+    
+    console.log(`✅ Получено ${uniqueMembers.length} уникальных участников клана ${clanTag}`);
+    
+    // Сортируем по очкам (убывание)
+    uniqueMembers.sort((a, b) => b.points - a.points);
+    
+    return uniqueMembers;
+    
+  } catch (error: any) {
+    console.error(`❌ Ошибка при загрузке участников клана ${clanTag}:`, error.message);
+    
+    // Если это ошибка 403 и есть еще попытки, пробуем снова
+    if (error.response?.status === 403 && retryCount < maxRetries) {
+      const delay = Math.pow(2, retryCount) * 1000; // Экспоненциальная задержка: 1с, 2с, 4с
+      console.log(`⏳ Повторная попытка через ${delay}мс...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchClanPoints(clanTag, retryCount + 1);
+    }
+    
+    // Если все попытки исчерпаны или другая ошибка, возвращаем пустой массив
+    console.log(`❌ Не удалось загрузить участников клана ${clanTag} после ${retryCount + 1} попыток`);
     return [];
   }
-  
-  return [];
 }
 
 function getActiveFile(): "a" | "b" {
