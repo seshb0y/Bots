@@ -451,7 +451,7 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
 
       // Получаем список самолётов для выбранной лицензии
       const aircraftType = getAircraftTypeByLicenseId(licenseId);
-      const aircraft = await getAircraftByType(aircraftType);
+      const aircraft = getAircraftByType(aircraftType);
 
       if (aircraft.length === 0) {
         await interaction.reply({
@@ -673,7 +673,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
       let selectedAircraft = null;
       if (aircraftId) {
         const aircraftType = getAircraftTypeByLicenseId(licenseId);
-        const aircraft = await getAircraftByType(aircraftType);
+        const aircraft = getAircraftByType(aircraftType);
         selectedAircraft = aircraft.find(a => a.id === aircraftId);
       }
 
@@ -897,7 +897,7 @@ export async function handleAircraftSelect(interaction: any) {
 
       const selectedAircraftId = interaction.values[0];
       const aircraftType = getAircraftTypeByLicenseId(licenseId);
-      const aircraft = await getAircraftByType(aircraftType);
+      const aircraft = getAircraftByType(aircraftType);
       const selectedAircraft = aircraft.find(a => a.id === selectedAircraftId);
 
       if (!selectedAircraft) {

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "./json.js";
+import { loadJson, saveJson } from "./json.js";
 import { info, error } from "./logger.js";
 
 // Типы самолётов
@@ -25,9 +25,9 @@ interface AircraftData {
 const AIRCRAFT_DATA_FILE = "data/aircraft.json";
 
 // Функция для загрузки данных о самолётах
-export async function loadAircraftData(): Promise<AircraftData> {
+export function loadAircraftData(): AircraftData {
   try {
-    const data = await readFile<AircraftData>(AIRCRAFT_DATA_FILE);
+    const data = loadJson<AircraftData>(AIRCRAFT_DATA_FILE);
     return data || getDefaultAircraftData();
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при загрузке данных о самолётах:`, err);
@@ -36,9 +36,9 @@ export async function loadAircraftData(): Promise<AircraftData> {
 }
 
 // Функция для сохранения данных о самолётах
-export async function saveAircraftData(data: AircraftData): Promise<void> {
+export function saveAircraftData(data: AircraftData): void {
   try {
-    await writeFile(AIRCRAFT_DATA_FILE, data);
+    saveJson(AIRCRAFT_DATA_FILE, data);
     info(`[AIRCRAFT] Данные о самолётах успешно сохранены`);
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при сохранении данных о самолётах:`, err);
@@ -47,9 +47,9 @@ export async function saveAircraftData(data: AircraftData): Promise<void> {
 }
 
 // Функция для получения списка самолётов по типу
-export async function getAircraftByType(type: AircraftType): Promise<Aircraft[]> {
+export function getAircraftByType(type: AircraftType): Aircraft[] {
   try {
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     return data[type] || [];
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при получении самолётов типа ${type}:`, err);
@@ -58,14 +58,14 @@ export async function getAircraftByType(type: AircraftType): Promise<Aircraft[]>
 }
 
 // Функция для получения всех самолётов
-export async function getAllAircraft(): Promise<AircraftData> {
-  return await loadAircraftData();
+export function getAllAircraft(): AircraftData {
+  return loadAircraftData();
 }
 
 // Функция для добавления самолёта
-export async function addAircraft(aircraft: Aircraft): Promise<void> {
+export function addAircraft(aircraft: Aircraft): void {
   try {
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     
     // Проверяем, не существует ли уже самолёт с таким ID
     const existingAircraft = data[aircraft.type].find(a => a.id === aircraft.id);
@@ -74,7 +74,7 @@ export async function addAircraft(aircraft: Aircraft): Promise<void> {
     }
     
     data[aircraft.type].push(aircraft);
-    await saveAircraftData(data);
+    saveAircraftData(data);
     info(`[AIRCRAFT] Самолёт "${aircraft.name}" успешно добавлен в категорию ${aircraft.type}`);
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при добавлении самолёта:`, err);
@@ -83,9 +83,9 @@ export async function addAircraft(aircraft: Aircraft): Promise<void> {
 }
 
 // Функция для удаления самолёта
-export async function removeAircraft(type: AircraftType, aircraftId: string): Promise<void> {
+export function removeAircraft(type: AircraftType, aircraftId: string): void {
   try {
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     const initialLength = data[type].length;
     
     data[type] = data[type].filter(a => a.id !== aircraftId);
@@ -94,7 +94,7 @@ export async function removeAircraft(type: AircraftType, aircraftId: string): Pr
       throw new Error(`Самолёт с ID "${aircraftId}" не найден в категории ${type}`);
     }
     
-    await saveAircraftData(data);
+    saveAircraftData(data);
     info(`[AIRCRAFT] Самолёт с ID "${aircraftId}" успешно удалён из категории ${type}`);
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при удалении самолёта:`, err);
@@ -103,9 +103,9 @@ export async function removeAircraft(type: AircraftType, aircraftId: string): Pr
 }
 
 // Функция для обновления самолёта
-export async function updateAircraft(aircraft: Aircraft): Promise<void> {
+export function updateAircraft(aircraft: Aircraft): void {
   try {
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     const index = data[aircraft.type].findIndex(a => a.id === aircraft.id);
     
     if (index === -1) {
@@ -113,7 +113,7 @@ export async function updateAircraft(aircraft: Aircraft): Promise<void> {
     }
     
     data[aircraft.type][index] = aircraft;
-    await saveAircraftData(data);
+    saveAircraftData(data);
     info(`[AIRCRAFT] Самолёт "${aircraft.name}" успешно обновлён в категории ${aircraft.type}`);
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при обновлении самолёта:`, err);
@@ -122,9 +122,9 @@ export async function updateAircraft(aircraft: Aircraft): Promise<void> {
 }
 
 // Функция для получения самолёта по ID
-export async function getAircraftById(type: AircraftType, aircraftId: string): Promise<Aircraft | null> {
+export function getAircraftById(type: AircraftType, aircraftId: string): Aircraft | null {
   try {
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     return data[type].find(a => a.id === aircraftId) || null;
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при поиске самолёта с ID "${aircraftId}":`, err);

@@ -31,7 +31,7 @@ function hasAircraftAdminRole(interaction: ChatInputCommandInteraction): boolean
   const member = interaction.member;
   
   // Проверяем права администратора
-  if (member.permissions && 'has' in member.permissions) {
+  if (member.permissions && typeof member.permissions === 'object' && 'has' in member.permissions) {
     try {
       if (member.permissions.has(PermissionFlagsBits.Administrator)) {
         return true;
@@ -42,7 +42,7 @@ function hasAircraftAdminRole(interaction: ChatInputCommandInteraction): boolean
   }
   
   // Проверяем роль администратора самолётов
-  if ('roles' in member && member.roles && 'cache' in member.roles) {
+  if ('roles' in member && member.roles && typeof member.roles === 'object' && 'cache' in member.roles) {
     try {
       return member.roles.cache.has(AIRCRAFT_ADMIN_ROLE_ID);
     } catch (err) {
@@ -59,7 +59,7 @@ export async function aircraftListCommand(interaction: ChatInputCommandInteracti
     info(`[AIRCRAFT] Пользователь ${interaction.user.tag} (${interaction.user.id}) запрашивает список самолётов`);
     
     const type = interaction.options.getString("тип") as AircraftType | null;
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     
     if (type) {
       // Показываем самолёты конкретного типа
@@ -162,7 +162,7 @@ export async function aircraftAddCommand(interaction: ChatInputCommandInteractio
       description: description || undefined
     };
     
-    await addAircraft(aircraft);
+    addAircraft(aircraft);
     
     const embed = new EmbedBuilder()
       .setTitle("✅ Самолёт добавлен")
@@ -209,7 +209,7 @@ export async function aircraftRemoveCommand(interaction: ChatInputCommandInterac
     const aircraftId = interaction.options.getString("id", true);
     
     // Получаем информацию о самолёте перед удалением
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     const aircraft = data[type].find(a => a.id === aircraftId);
     
     if (!aircraft) {
@@ -220,7 +220,7 @@ export async function aircraftRemoveCommand(interaction: ChatInputCommandInterac
       return;
     }
     
-    await removeAircraft(type, aircraftId);
+    removeAircraft(type, aircraftId);
     
     const embed = new EmbedBuilder()
       .setTitle("🗑️ Самолёт удалён")
@@ -266,7 +266,7 @@ export async function aircraftUpdateCommand(interaction: ChatInputCommandInterac
     const description = interaction.options.getString("описание");
     
     // Получаем текущие данные самолёта
-    const data = await loadAircraftData();
+    const data = loadAircraftData();
     const currentAircraft = data[type].find(a => a.id === aircraftId);
     
     if (!currentAircraft) {
@@ -286,7 +286,7 @@ export async function aircraftUpdateCommand(interaction: ChatInputCommandInterac
       description: description !== null ? description : currentAircraft.description
     };
     
-    await updateAircraft(updatedAircraft);
+    updateAircraft(updatedAircraft);
     
     const embed = new EmbedBuilder()
       .setTitle("✏️ Самолёт обновлён")
@@ -324,7 +324,7 @@ export async function handleAircraftTypeSelect(interaction: any) {
     
     if (interaction.customId === "aircraft_type_select") {
       const type = interaction.values[0] as AircraftType;
-      const data = await loadAircraftData();
+      const data = loadAircraftData();
       const aircraft = data[type] || [];
       const typeName = getAircraftTypeName(type);
       
@@ -379,7 +379,7 @@ export async function handleAircraftListBack(interaction: any) {
     if (!interaction.isButton()) return;
     
     if (interaction.customId === "aircraft_list_back") {
-      const data = await loadAircraftData();
+      const data = loadAircraftData();
       
       const embed = new EmbedBuilder()
         .setTitle("✈️ Список самолётов")
