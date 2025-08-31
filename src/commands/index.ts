@@ -200,7 +200,7 @@ export function setupCommands(client: Client) {
           case "flight-academy":
             await flightAcademyCommand(interaction);
             break;
-                  case "aircraft-list":
+        case "aircraft-list":
           info(`[COMMAND] Выполняется команда aircraft-list для пользователя ${interaction.user.tag}`);
           await aircraftListCommand(interaction);
           info(`[COMMAND] Команда aircraft-list завершена для пользователя ${interaction.user.tag}`);
@@ -220,7 +220,7 @@ export function setupCommands(client: Client) {
           case "simpletest":
             await simpleTestCommand(interaction);
             break;
-                  default:
+        default:
           info(`[COMMAND] Команда ${commandName} не найдена в обработчике`);
           logCommand(`Неизвестная команда: ${commandName}`, { 
             userId: interaction.user.id, 
