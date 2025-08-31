@@ -913,7 +913,7 @@ export async function handleAircraftSelect(interaction: any) {
       // Создаём модальное окно для заполнения формы
       const modal = new ModalBuilder()
         .setCustomId(`academy_form_${licenseId}_${selectedAircraftId}`)
-        .setTitle(`Заявка на лицензию: ${license.name} - ${selectedAircraft.name}`);
+        .setTitle(`${license.name} - ${selectedAircraft.name}`);
 
       const experienceInput = new TextInputBuilder()
         .setCustomId("experience")
