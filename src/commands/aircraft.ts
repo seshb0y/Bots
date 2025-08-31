@@ -83,7 +83,7 @@ export async function aircraftListCommand(interaction: ChatInputCommandInteracti
       aircraft.forEach((plane, index) => {
         embed.addFields({
           name: `${index + 1}. ${plane.name}`,
-          value: `**Нация:** ${plane.nation}\n**БР:** ${plane.br}\n**ID:** \`${plane.id}\`${plane.description ? `\n**Описание:** ${plane.description}` : ''}`,
+          value: `**Нация:** ${plane.nation}\n**БР:** ${plane.br}`,
           inline: true
         });
       });
@@ -150,16 +150,12 @@ export async function aircraftAddCommand(interaction: ChatInputCommandInteractio
     const name = interaction.options.getString("название", true);
     const br = interaction.options.getString("бр", true);
     const nation = interaction.options.getString("нация", true);
-    const description = interaction.options.getString("описание");
-    const id = interaction.options.getString("id") || name.toLowerCase().replace(/\s+/g, "_");
     
     const aircraft: Aircraft = {
-      id,
       name,
       type,
       br,
-      nation,
-      description: description || undefined
+      nation
     };
     
     addAircraft(aircraft);
@@ -169,16 +165,12 @@ export async function aircraftAddCommand(interaction: ChatInputCommandInteractio
       .setDescription(`Самолёт **${name}** успешно добавлен в категорию **${getAircraftTypeName(type)}**`)
       .setColor(0x00ff00)
       .addFields(
-        { name: "ID", value: id, inline: true },
+        { name: "Название", value: name, inline: true },
         { name: "Тип", value: getAircraftTypeName(type), inline: true },
         { name: "БР", value: br, inline: true },
         { name: "Нация", value: nation, inline: true }
       )
       .setTimestamp();
-    
-    if (description) {
-      embed.addFields({ name: "Описание", value: description, inline: false });
-    }
     
     await interaction.reply({ embeds: [embed], ephemeral: true });
     info(`[AIRCRAFT] Самолёт "${name}" добавлен пользователем ${interaction.user.tag}`);
@@ -206,30 +198,31 @@ export async function aircraftRemoveCommand(interaction: ChatInputCommandInterac
     }
     
     const type = interaction.options.getString("тип", true) as AircraftType;
-    const aircraftId = interaction.options.getString("id", true);
+    const aircraftName = interaction.options.getString("название", true);
     
     // Получаем информацию о самолёте перед удалением
     const data = loadAircraftData();
-    const aircraft = data[type].find(a => a.id === aircraftId);
+    const aircraft = data[type].find(a => a.name === aircraftName);
     
     if (!aircraft) {
       await interaction.reply({
-        content: `❌ Самолёт с ID "${aircraftId}" не найден в категории ${getAircraftTypeName(type)}`,
+        content: `❌ Самолёт "${aircraftName}" не найден в категории ${getAircraftTypeName(type)}`,
         ephemeral: true
       });
       return;
     }
     
-    removeAircraft(type, aircraftId);
+    removeAircraft(type, aircraftName);
     
     const embed = new EmbedBuilder()
       .setTitle("🗑️ Самолёт удалён")
       .setDescription(`Самолёт **${aircraft.name}** успешно удалён из категории **${getAircraftTypeName(type)}**`)
       .setColor(0xff0000)
       .addFields(
-        { name: "ID", value: aircraftId, inline: true },
         { name: "Название", value: aircraft.name, inline: true },
-        { name: "Тип", value: getAircraftTypeName(type), inline: true }
+        { name: "Тип", value: getAircraftTypeName(type), inline: true },
+        { name: "БР", value: aircraft.br, inline: true },
+        { name: "Нация", value: aircraft.nation, inline: true }
       )
       .setTimestamp();
     
@@ -259,19 +252,18 @@ export async function aircraftUpdateCommand(interaction: ChatInputCommandInterac
     }
     
     const type = interaction.options.getString("тип", true) as AircraftType;
-    const aircraftId = interaction.options.getString("id", true);
-    const name = interaction.options.getString("название");
+    const aircraftName = interaction.options.getString("название", true);
+    const newName = interaction.options.getString("новое_название");
     const br = interaction.options.getString("бр");
     const nation = interaction.options.getString("нация");
-    const description = interaction.options.getString("описание");
     
     // Получаем текущие данные самолёта
     const data = loadAircraftData();
-    const currentAircraft = data[type].find(a => a.id === aircraftId);
+    const currentAircraft = data[type].find(a => a.name === aircraftName);
     
     if (!currentAircraft) {
       await interaction.reply({
-        content: `❌ Самолёт с ID "${aircraftId}" не найден в категории ${getAircraftTypeName(type)}`,
+        content: `❌ Самолёт "${aircraftName}" не найден в категории ${getAircraftTypeName(type)}`,
         ephemeral: true
       });
       return;
@@ -279,11 +271,10 @@ export async function aircraftUpdateCommand(interaction: ChatInputCommandInterac
     
     // Обновляем только указанные поля
     const updatedAircraft: Aircraft = {
-      ...currentAircraft,
-      name: name || currentAircraft.name,
+      name: newName || currentAircraft.name,
+      type: currentAircraft.type,
       br: br || currentAircraft.br,
-      nation: nation || currentAircraft.nation,
-      description: description !== null ? description : currentAircraft.description
+      nation: nation || currentAircraft.nation
     };
     
     updateAircraft(updatedAircraft);
@@ -293,17 +284,12 @@ export async function aircraftUpdateCommand(interaction: ChatInputCommandInterac
       .setDescription(`Самолёт **${updatedAircraft.name}** успешно обновлён`)
       .setColor(0x00ff00)
       .addFields(
-        { name: "ID", value: aircraftId, inline: true },
         { name: "Название", value: updatedAircraft.name, inline: true },
         { name: "Тип", value: getAircraftTypeName(type), inline: true },
         { name: "БР", value: updatedAircraft.br, inline: true },
         { name: "Нация", value: updatedAircraft.nation, inline: true }
       )
       .setTimestamp();
-    
-    if (updatedAircraft.description) {
-      embed.addFields({ name: "Описание", value: updatedAircraft.description, inline: false });
-    }
     
     await interaction.reply({ embeds: [embed], ephemeral: true });
     info(`[AIRCRAFT] Самолёт "${updatedAircraft.name}" обновлён пользователем ${interaction.user.tag}`);
@@ -346,7 +332,7 @@ export async function handleAircraftTypeSelect(interaction: any) {
       aircraft.forEach((plane, index) => {
         embed.addFields({
           name: `${index + 1}. ${plane.name}`,
-          value: `**Нация:** ${plane.nation}\n**БР:** ${plane.br}\n**ID:** \`${plane.id}\`${plane.description ? `\n**Описание:** ${plane.description}` : ''}`,
+          value: `**Нация:** ${plane.nation}\n**БР:** ${plane.br}`,
           inline: true
         });
       });

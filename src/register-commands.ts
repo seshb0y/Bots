@@ -138,23 +138,11 @@ const commands = [
         .setDescription("Боевой рейтинг")
         .setRequired(true)
     )
-    .addStringOption((option) =>
+        .addStringOption((option) =>
       option
         .setName("нация")
         .setDescription("Нация самолёта")
         .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("описание")
-        .setDescription("Описание самолёта")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("id")
-        .setDescription("Уникальный ID самолёта")
-        .setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("aircraft-remove")
@@ -173,8 +161,8 @@ const commands = [
     )
     .addStringOption((option) =>
       option
-        .setName("id")
-        .setDescription("ID самолёта для удаления")
+        .setName("название")
+        .setDescription("Название самолёта для удаления")
         .setRequired(true)
     ),
   new SlashCommandBuilder()
@@ -194,13 +182,13 @@ const commands = [
     )
     .addStringOption((option) =>
       option
-        .setName("id")
-        .setDescription("ID самолёта для обновления")
+        .setName("название")
+        .setDescription("Название самолёта для обновления")
         .setRequired(true)
     )
     .addStringOption((option) =>
       option
-        .setName("название")
+        .setName("новое_название")
         .setDescription("Новое название самолёта")
         .setRequired(false)
     )
@@ -214,12 +202,6 @@ const commands = [
       option
         .setName("нация")
         .setDescription("Новая нация самолёта")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("описание")
-        .setDescription("Новое описание самолёта")
         .setRequired(false)
     ),
   new SlashCommandBuilder()

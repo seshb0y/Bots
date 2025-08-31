@@ -6,12 +6,10 @@ export type AircraftType = 'piston' | 'early_jet' | 'modern_jet';
 
 // Интерфейс самолёта
 export interface Aircraft {
-  id: string;
   name: string;
   type: AircraftType;
   br: string;
   nation: string;
-  description?: string;
 }
 
 // Структура данных для хранения списков самолётов
@@ -67,10 +65,10 @@ export function addAircraft(aircraft: Aircraft): void {
   try {
     const data = loadAircraftData();
     
-    // Проверяем, не существует ли уже самолёт с таким ID
-    const existingAircraft = data[aircraft.type].find(a => a.id === aircraft.id);
+    // Проверяем, не существует ли уже самолёт с таким названием
+    const existingAircraft = data[aircraft.type].find(a => a.name === aircraft.name);
     if (existingAircraft) {
-      throw new Error(`Самолёт с ID "${aircraft.id}" уже существует в категории ${aircraft.type}`);
+      throw new Error(`Самолёт "${aircraft.name}" уже существует в категории ${aircraft.type}`);
     }
     
     data[aircraft.type].push(aircraft);
@@ -83,19 +81,19 @@ export function addAircraft(aircraft: Aircraft): void {
 }
 
 // Функция для удаления самолёта
-export function removeAircraft(type: AircraftType, aircraftId: string): void {
+export function removeAircraft(type: AircraftType, aircraftName: string): void {
   try {
     const data = loadAircraftData();
     const initialLength = data[type].length;
     
-    data[type] = data[type].filter(a => a.id !== aircraftId);
+    data[type] = data[type].filter(a => a.name !== aircraftName);
     
     if (data[type].length === initialLength) {
-      throw new Error(`Самолёт с ID "${aircraftId}" не найден в категории ${type}`);
+      throw new Error(`Самолёт "${aircraftName}" не найден в категории ${type}`);
     }
     
     saveAircraftData(data);
-    info(`[AIRCRAFT] Самолёт с ID "${aircraftId}" успешно удалён из категории ${type}`);
+    info(`[AIRCRAFT] Самолёт "${aircraftName}" успешно удалён из категории ${type}`);
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при удалении самолёта:`, err);
     throw err;
@@ -106,10 +104,10 @@ export function removeAircraft(type: AircraftType, aircraftId: string): void {
 export function updateAircraft(aircraft: Aircraft): void {
   try {
     const data = loadAircraftData();
-    const index = data[aircraft.type].findIndex(a => a.id === aircraft.id);
+    const index = data[aircraft.type].findIndex(a => a.name === aircraft.name);
     
     if (index === -1) {
-      throw new Error(`Самолёт с ID "${aircraft.id}" не найден в категории ${aircraft.type}`);
+      throw new Error(`Самолёт "${aircraft.name}" не найден в категории ${aircraft.type}`);
     }
     
     data[aircraft.type][index] = aircraft;
@@ -121,13 +119,13 @@ export function updateAircraft(aircraft: Aircraft): void {
   }
 }
 
-// Функция для получения самолёта по ID
-export function getAircraftById(type: AircraftType, aircraftId: string): Aircraft | null {
+// Функция для получения самолёта по названию
+export function getAircraftByName(type: AircraftType, aircraftName: string): Aircraft | null {
   try {
     const data = loadAircraftData();
-    return data[type].find(a => a.id === aircraftId) || null;
+    return data[type].find(a => a.name === aircraftName) || null;
   } catch (err) {
-    error(`[AIRCRAFT] Ошибка при поиске самолёта с ID "${aircraftId}":`, err);
+    error(`[AIRCRAFT] Ошибка при поиске самолёта "${aircraftName}":`, err);
     return null;
   }
 }
@@ -136,8 +134,8 @@ export function getAircraftById(type: AircraftType, aircraftId: string): Aircraf
 export function createAircraftOptions(aircraft: Aircraft[]): Array<{ label: string; value: string; description?: string }> {
   return aircraft.map(a => ({
     label: a.name,
-    value: a.id,
-    description: `${a.nation} | БР ${a.br}${a.description ? ` | ${a.description}` : ''}`
+    value: a.name,
+    description: `${a.nation} | БР ${a.br}`
   }));
 }
 
@@ -182,80 +180,62 @@ function getDefaultAircraftData(): AircraftData {
   return {
     piston: [
       {
-        id: "bf109_f4",
         name: "Bf 109 F-4",
         type: "piston",
         br: "4.3",
-        nation: "Германия",
-        description: "Отличный истребитель для дуэлей"
+        nation: "Германия"
       },
       {
-        id: "spitfire_mk5b",
         name: "Spitfire Mk.Vb",
         type: "piston",
         br: "4.7",
-        nation: "Великобритания",
-        description: "Манёвренный истребитель"
+        nation: "Великобритания"
       },
       {
-        id: "p51d30",
         name: "P-51D-30",
         type: "piston",
         br: "5.0",
-        nation: "США",
-        description: "Универсальный истребитель"
+        nation: "США"
       }
     ],
     early_jet: [
       {
-        id: "me262_a1",
         name: "Me 262 A-1",
         type: "early_jet",
         br: "7.7",
-        nation: "Германия",
-        description: "Первый реактивный истребитель"
+        nation: "Германия"
       },
       {
-        id: "mig15",
         name: "MiG-15",
         type: "early_jet",
         br: "8.7",
-        nation: "СССР",
-        description: "Отличный реактивный истребитель"
+        nation: "СССР"
       },
       {
-        id: "f86f2",
         name: "F-86F-2",
         type: "early_jet",
         br: "8.7",
-        nation: "США",
-        description: "Американский реактивный истребитель"
+        nation: "США"
       }
     ],
     modern_jet: [
       {
-        id: "mig21bis",
         name: "MiG-21bis",
         type: "modern_jet",
         br: "10.3",
-        nation: "СССР",
-        description: "Современный реактивный истребитель"
+        nation: "СССР"
       },
       {
-        id: "f4e",
         name: "F-4E Phantom II",
         type: "modern_jet",
         br: "11.0",
-        nation: "США",
-        description: "Многоцелевой истребитель"
+        nation: "США"
       },
       {
-        id: "su27",
         name: "Su-27",
         type: "modern_jet",
         br: "12.0",
-        nation: "СССР",
-        description: "Современный тяжёлый истребитель"
+        nation: "СССР"
       }
     ]
   };

@@ -1,80 +1,62 @@
 {
   "piston": [
     {
-      "id": "bf109_f4",
       "name": "Bf 109 F-4",
       "type": "piston",
       "br": "4.3",
-      "nation": "Германия",
-      "description": "Отличный истребитель для дуэлей"
+      "nation": "Германия"
     },
     {
-      "id": "spitfire_mk5b",
       "name": "Spitfire Mk.Vb",
       "type": "piston",
       "br": "4.7",
-      "nation": "Великобритания",
-      "description": "Манёвренный истребитель"
+      "nation": "Великобритания"
     },
     {
-      "id": "p51d30",
       "name": "P-51D-30",
       "type": "piston",
       "br": "5.0",
-      "nation": "США",
-      "description": "Универсальный истребитель"
+      "nation": "США"
     }
   ],
   "early_jet": [
     {
-      "id": "me262_a1",
       "name": "Me 262 A-1",
       "type": "early_jet",
       "br": "7.7",
-      "nation": "Германия",
-      "description": "Первый реактивный истребитель"
+      "nation": "Германия"
     },
     {
-      "id": "mig15",
       "name": "MiG-15",
       "type": "early_jet",
       "br": "8.7",
-      "nation": "СССР",
-      "description": "Отличный реактивный истребитель"
+      "nation": "СССР"
     },
     {
-      "id": "f86f2",
       "name": "F-86F-2",
       "type": "early_jet",
       "br": "8.7",
-      "nation": "США",
-      "description": "Американский реактивный истребитель"
+      "nation": "США"
     }
   ],
   "modern_jet": [
     {
-      "id": "mig21bis",
       "name": "MiG-21bis",
       "type": "modern_jet",
       "br": "10.3",
-      "nation": "СССР",
-      "description": "Современный реактивный истребитель"
+      "nation": "СССР"
     },
     {
-      "id": "f4e",
       "name": "F-4E Phantom II",
       "type": "modern_jet",
       "br": "11.0",
-      "nation": "США",
-      "description": "Многоцелевой истребитель"
+      "nation": "США"
     },
     {
-      "id": "su27",
       "name": "Su-27",
       "type": "modern_jet",
       "br": "12.0",
-      "nation": "СССР",
-      "description": "Современный тяжёлый истребитель"
+      "nation": "СССР"
     }
   ]
 }
