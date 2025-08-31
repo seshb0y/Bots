@@ -45,8 +45,7 @@ export function setupCommands(client: Client) {
         if (interaction.customId.startsWith("type_") || 
             interaction.customId.startsWith("license_") || 
             interaction.customId.startsWith("training_") || 
-            interaction.customId.startsWith("close_ticket_") ||
-            interaction.customId === "back_to_main") {
+            interaction.customId.startsWith("close_ticket_")) {
           await flightAcademyButton(interaction);
           return;
         }

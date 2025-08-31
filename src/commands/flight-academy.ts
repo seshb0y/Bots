@@ -284,18 +284,7 @@ async function showLicenseMenu(interaction: ButtonInteraction) {
       rows.push(row);
     }
 
-    // Добавляем кнопку "Назад"
-    info(`[FLIGHT-ACADEMY] Создаём кнопку "Назад"`);
-    const backRow = new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId("back_to_main")
-          .setLabel("← Назад")
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji("⬅️")
-      );
-
-    rows.push(backRow);
+    // Кнопка "Назад" убрана для упрощения навигации
 
     info(`[FLIGHT-ACADEMY] Всего создано ${rows.length} рядов кнопок`);
     info(`[FLIGHT-ACADEMY] Создаём новое приватное сообщение для пользователя ${interaction.user.tag}`);
@@ -381,18 +370,7 @@ async function showTrainingMenu(interaction: ButtonInteraction) {
       rows.push(row);
     }
 
-    // Добавляем кнопку "Назад"
-    info(`[FLIGHT-ACADEMY] Создаём кнопку "Назад"`);
-    const backRow = new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId("back_to_main")
-          .setLabel("← Назад")
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji("⬅️")
-      );
-
-    rows.push(backRow);
+    // Кнопка "Назад" убрана для упрощения навигации
 
     info(`[FLIGHT-ACADEMY] Всего создано ${rows.length} рядов кнопок`);
     info(`[FLIGHT-ACADEMY] Создаём новое приватное сообщение для пользователя ${interaction.user.tag}`);
@@ -453,37 +431,7 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
       return;
     }
 
-    // Обработка кнопки "Назад"
-    if (interaction.customId === "back_to_main") {
-      try {
-        info(`[FLIGHT-ACADEMY] Пользователь ${interaction.user.tag} (${interaction.user.id}) возвращается к главному меню`);
-
-        // Обновляем сообщение, убирая все кнопки (возвращаемся к главному меню)
-        info(`[FLIGHT-ACADEMY] Обновляем сообщение, убирая подменю`);
-        
-        await interaction.update({
-          content: "✅ Вы вернулись к главному меню лётной академии. Используйте кнопки в сообщении выше для навигации.",
-          embeds: [],
-          components: []
-        });
-        
-        info(`[FLIGHT-ACADEMY] Сообщение обновлено, пользователь ${interaction.user.tag} вернулся к главному меню`);
-
-      } catch (err) {
-        error(`[FLIGHT-ACADEMY] Ошибка при возврате в главное меню для пользователя ${interaction.user.tag}:`, err);
-        try {
-          info(`[FLIGHT-ACADEMY] Пытаемся отправить сообщение об ошибке пользователю ${interaction.user.tag}`);
-          await interaction.reply({
-            content: "❌ Произошла ошибка при возврате в главное меню",
-            ephemeral: true
-          });
-          info(`[FLIGHT-ACADEMY] Сообщение об ошибке отправлено пользователю ${interaction.user.tag}`);
-        } catch (replyErr) {
-          error(`[FLIGHT-ACADEMY] Не удалось отправить сообщение об ошибке пользователю ${interaction.user.tag}:`, replyErr);
-        }
-      }
-      return;
-    }
+    // Кнопка "Назад" убрана для упрощения навигации
 
     // Обработка выбора лицензии
     if (interaction.customId.startsWith("license_")) {
