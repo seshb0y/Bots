@@ -16,7 +16,7 @@ import {
 } from "discord.js";
 import { info, error } from "../utils/logger.js";
 import { FLIGHT_ACADEMY_CHANNEL_ID, FLIGHT_ACADEMY_NOTIFY_USER_ID, FLIGHT_ACADEMY_OFFICER_ROLE_IDS } from "../constants.js";
-import { createAircraftOptions, getAircraftById, getAircraftByType } from "../utils/aircraft.js";
+import { createAircraftOptions, getAircraftById } from "../utils/aircraft.js";
 
 // Функция для получения отображаемого имени пользователя на сервере
 function getUserDisplayName(interaction: any): string {
@@ -449,12 +449,10 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
         return;
       }
 
-      // Показываем модальное окно с селектором самолётов
-      await showLicenseFormWithAircraft(interaction, license);
+      // Показываем экран выбора самолёта с селектором
+      await showAircraftSelection(interaction, license);
       return;
     }
-
-    // Селектор самолётов теперь встроен в форму лицензии
 
     // Обработка закрытия тикета
     if (interaction.customId.startsWith("close_ticket_")) {
@@ -511,6 +509,25 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
           ephemeral: true
         });
       }
+      return;
+    }
+
+    // Обработка выбора самолёта
+    if (interaction.customId.startsWith("aircraft_select_")) {
+      info(`[FLIGHT-ACADEMY] Обрабатываем выбор самолёта: ${interaction.customId}`);
+      const licenseId = interaction.customId.replace("aircraft_select_", "");
+      const license = LICENSE_TYPES.find(l => l.id === licenseId);
+
+      if (!license) {
+        await interaction.reply({
+          content: "❌ Неизвестный тип лицензии",
+          ephemeral: true
+        });
+        return;
+      }
+
+      // Показываем модальное окно для заполнения формы
+      await showLicenseForm(interaction, license);
       return;
     }
 
@@ -631,11 +648,6 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
 
       const experience = interaction.fields.getTextInputValue("experience");
       const motivation = interaction.fields.getTextInputValue("motivation");
-      const aircraftId = interaction.fields.getTextInputValue("aircraft_id");
-
-      // Получаем информацию о выбранном самолёте
-      const selectedAircraft = getAircraftById(aircraftId);
-      const aircraftInfo = selectedAircraft ? `${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})` : `ID: ${aircraftId}`;
 
       // Создаём embed с заявкой на лицензию
       const applicationEmbed = new EmbedBuilder()
@@ -644,7 +656,6 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         .addFields(
           { name: "👤 Пользователь Discord", value: `${getUserDisplayName(interaction)} (${interaction.user.id})`, inline: true },
           { name: "✈️ Лицензия", value: `${license.name} (БР ${license.brRange})`, inline: true },
-          { name: "🛩️ Выбранный самолёт", value: aircraftInfo, inline: true },
           { name: "📚 Опыт", value: experience, inline: false },
           { name: "🎯 Мотивация", value: motivation, inline: false },
           { name: "🧪 Тесты", value: license.tests.join(", "), inline: false }
@@ -694,7 +705,6 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
           .addFields(
             { name: "👤 Пользователь Discord", value: `${getUserDisplayName(interaction)} (${interaction.user.id})`, inline: true },
             { name: "✈️ Лицензия", value: `${license.name} (БР ${license.brRange})`, inline: true },
-            { name: "🛩️ Выбранный самолёт", value: aircraftInfo, inline: true },
             { name: "📚 Опыт", value: experience, inline: false },
             { name: "🎯 Мотивация", value: motivation, inline: false },
             { name: "🧪 Тесты", value: license.tests.join(", "), inline: false }
@@ -812,10 +822,10 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
   info(`[FLIGHT-ACADEMY] === КОНЕЦ ОБРАБОТКИ МОДАЛЬНОГО ОКНА ===`);
 }
 
-// Функция для показа формы лицензии с селектором самолётов
-async function showLicenseFormWithAircraft(interaction: ButtonInteraction, license: LicenseType) {
+// Функция для показа экрана выбора самолёта с селектором
+async function showAircraftSelection(interaction: ButtonInteraction, license: LicenseType) {
   try {
-    info(`[FLIGHT-ACADEMY] Показываем форму лицензии с селектором самолётов для: ${license.name}`);
+    info(`[FLIGHT-ACADEMY] Показываем экран выбора самолёта для лицензии: ${license.name}`);
     
     // Определяем тип самолётов на основе лицензии
     let aircraftType: 'piston' | 'early_jet' | 'modern_jet';
@@ -833,19 +843,58 @@ async function showLicenseFormWithAircraft(interaction: ButtonInteraction, licen
         aircraftType = 'piston';
     }
     
-    // Получаем список самолётов для отображения в описании
-    const aircraft = getAircraftByType(aircraftType);
-    let aircraftListText = '';
+    // Создаём опции для селектора
+    const aircraftOptions = createAircraftOptions(aircraftType);
     
-    if (aircraft.length > 0) {
-      aircraftListText = aircraft.map((a: any) => `• ${a.name} (ID: \`${a.id}\`)`).join('\n');
-    } else {
-      aircraftListText = 'В данной категории пока нет доступных самолётов. Обратитесь к администратору.';
+    if (aircraftOptions.length === 0) {
+      await interaction.reply({
+        content: '❌ В данной категории пока нет доступных самолётов. Обратитесь к администратору.',
+        ephemeral: true
+      });
+      return;
     }
+    
+    // Создаём embed с информацией о лицензии
+    const embed = new EmbedBuilder()
+      .setTitle(`✈️ Выбор самолёта для лицензии: ${license.name}`)
+      .setDescription(`Выберите самолёт, на котором хотите проходить лицензирование.\n\n**Описание:** ${license.description}\n**БР:** ${license.brRange}\n**Тесты:** ${license.tests.join(', ')}`)
+      .setColor(0x00ff00)
+      .setTimestamp();
+    
+    // Создаём селектор самолётов
+    const aircraftSelect = new StringSelectMenuBuilder()
+      .setCustomId(`aircraft_select_${license.id}`)
+      .setPlaceholder('Выберите самолёт для лицензирования')
+      .addOptions(aircraftOptions);
+    
+    const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(aircraftSelect);
+    
+    // Показываем экран выбора
+    await interaction.reply({
+      embeds: [embed],
+      components: [selectRow],
+      ephemeral: true
+    });
+    
+    info(`[FLIGHT-ACADEMY] Экран выбора самолёта показан для ${interaction.user.tag}`);
+    
+  } catch (err) {
+    error(`[FLIGHT-ACADEMY] Ошибка при показе экрана выбора самолёта для ${interaction.user.tag}:`, err);
+    await interaction.reply({
+      content: '❌ Произошла ошибка при загрузке списка самолётов',
+      ephemeral: true
+    });
+  }
+}
+
+// Функция для показа формы лицензии
+async function showLicenseForm(interaction: ButtonInteraction, license: LicenseType) {
+  try {
+    info(`[FLIGHT-ACADEMY] Показываем форму лицензии для: ${license.name}`);
     
     // Создаём модальное окно для заполнения формы
     const modal = new ModalBuilder()
-      .setCustomId(`academy_form_${license.id}`)
+      .setCustomId(`academy_form_${license.id}_aircraft`)
       .setTitle(`Заявка на лицензию: ${license.name}`);
 
     const experienceInput = new TextInputBuilder()
@@ -864,43 +913,21 @@ async function showLicenseFormWithAircraft(interaction: ButtonInteraction, licen
       .setRequired(true)
       .setMaxLength(1000);
 
-    const aircraftInput = new TextInputBuilder()
-      .setCustomId("aircraft_id")
-      .setLabel("ID самолёта для лицензирования")
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder("Введите ID самолёта из списка ниже")
-      .setRequired(true)
-      .setMaxLength(50);
-
     const firstRow = new ActionRowBuilder<TextInputBuilder>().addComponents(experienceInput);
     const secondRow = new ActionRowBuilder<TextInputBuilder>().addComponents(motivationInput);
-    const thirdRow = new ActionRowBuilder<TextInputBuilder>().addComponents(aircraftInput);
 
-    modal.addComponents(firstRow, secondRow, thirdRow);
+    modal.addComponents(firstRow, secondRow);
 
-    // Показываем модальное окно
     await interaction.showModal(modal);
-    
-    // Отправляем дополнительную информацию о доступных самолётах
-    const embed = new EmbedBuilder()
-      .setTitle(`✈️ Доступные самолёты для лицензии: ${license.name}`)
-      .setDescription(`**Описание:** ${license.description}\n**БР:** ${license.brRange}\n**Тесты:** ${license.tests.join(', ')}\n\n**Доступные самолёты:**\n${aircraftListText}`)
-      .setColor(0x00ff00)
-      .setTimestamp();
-    
-    await interaction.followUp({
-      embeds: [embed],
-      ephemeral: true
-    });
-    
-    info(`[FLIGHT-ACADEMY] Форма лицензии с селектором самолётов показана для ${interaction.user.tag}`);
+    info(`[FLIGHT-ACADEMY] Форма лицензии показана для ${interaction.user.tag}`);
     
   } catch (err) {
-    error(`[FLIGHT-ACADEMY] Ошибка при показе формы лицензии с селектором самолётов для ${interaction.user.tag}:`, err);
+    error(`[FLIGHT-ACADEMY] Ошибка при показе формы лицензии для ${interaction.user.tag}:`, err);
     await interaction.reply({
       content: '❌ Произошла ошибка при загрузке формы',
       ephemeral: true
     });
   }
 }
+
 
