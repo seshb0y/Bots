@@ -648,14 +648,31 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
       
       // Проверяем, есть ли информация о выбранном самолёте
       const formData = interaction.customId.replace("academy_form_", "");
-      const parts = formData.split("_");
-      const licenseId = parts[0];
-      // Для самолётов с подчёркиваниями в названии (например, bf109_f4)
-      const aircraftId = parts.slice(1).join("_");
+      
+      // Ищем лицензию по точному совпадению или по началу строки
+      let licenseId = "";
+      let aircraftId = "";
+      
+      // Сначала пробуем найти точное совпадение
+      for (const license of LICENSE_TYPES) {
+        if (formData.startsWith(license.id + "_")) {
+          licenseId = license.id;
+          aircraftId = formData.replace(license.id + "_", "");
+          break;
+        }
+      }
+      
+      // Если не найдено, используем старый метод как fallback
+      if (!licenseId) {
+        const parts = formData.split("_");
+        licenseId = parts[0];
+        aircraftId = parts.slice(1).join("_");
+        info(`[FLIGHT-ACADEMY] Fallback: используем старый метод парсинга`);
+      }
       
       info(`[FLIGHT-ACADEMY] ID лицензии: ${licenseId}, ID самолёта: ${aircraftId}`);
       info(`[FLIGHT-ACADEMY] Полный customId: ${interaction.customId}`);
-      info(`[FLIGHT-ACADEMY] Разобранные части: ${JSON.stringify(parts)}`);
+      info(`[FLIGHT-ACADEMY] Форма данных: ${formData}`);
       const license = LICENSE_TYPES.find(l => l.id === licenseId);
 
       if (!license) {
