@@ -650,9 +650,12 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
       const formData = interaction.customId.replace("academy_form_", "");
       const parts = formData.split("_");
       const licenseId = parts[0];
-      const aircraftId = parts.length > 1 ? parts[1] : null;
+      // Для самолётов с подчёркиваниями в названии (например, bf109_f4)
+      const aircraftId = parts.slice(1).join("_");
       
       info(`[FLIGHT-ACADEMY] ID лицензии: ${licenseId}, ID самолёта: ${aircraftId}`);
+      info(`[FLIGHT-ACADEMY] Полный customId: ${interaction.customId}`);
+      info(`[FLIGHT-ACADEMY] Разобранные части: ${JSON.stringify(parts)}`);
       const license = LICENSE_TYPES.find(l => l.id === licenseId);
 
       if (!license) {
@@ -672,9 +675,29 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
       // Получаем информацию о выбранном самолёте
       let selectedAircraft = null;
       if (aircraftId) {
+        info(`[FLIGHT-ACADEMY] Ищем самолёт с ID: ${aircraftId}`);
         const aircraftType = getAircraftTypeByLicenseId(licenseId);
+        info(`[FLIGHT-ACADEMY] Тип самолёта для лицензии ${licenseId}: ${aircraftType}`);
         const aircraft = getAircraftByType(aircraftType);
+        info(`[FLIGHT-ACADEMY] Найдено самолётов типа ${aircraftType}: ${aircraft.length}`);
+        
+        // Попробуем найти самолёт по точному совпадению ID
         selectedAircraft = aircraft.find(a => a.id === aircraftId);
+        
+        // Если не найден, попробуем найти по частичному совпадению
+        if (!selectedAircraft) {
+          info(`[FLIGHT-ACADEMY] Точное совпадение не найдено, ищем по частичному совпадению`);
+          selectedAircraft = aircraft.find(a => a.id.includes(aircraftId) || aircraftId.includes(a.id));
+        }
+        
+        if (selectedAircraft) {
+          info(`[FLIGHT-ACADEMY] Самолёт найден: ${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})`);
+        } else {
+          info(`[FLIGHT-ACADEMY] Самолёт с ID ${aircraftId} не найден в списке ${aircraftType}`);
+          info(`[FLIGHT-ACADEMY] Доступные самолёты: ${aircraft.map(a => a.id).join(", ")}`);
+        }
+      } else {
+        info(`[FLIGHT-ACADEMY] ID самолёта не найден в customId`);
       }
 
       // Создаём embed с заявкой на лицензию
@@ -896,9 +919,11 @@ export async function handleAircraftSelect(interaction: any) {
       }
 
       const selectedAircraftId = interaction.values[0];
+      info(`[FLIGHT-ACADEMY] Выбранный ID самолёта: ${selectedAircraftId}`);
       const aircraftType = getAircraftTypeByLicenseId(licenseId);
       const aircraft = getAircraftByType(aircraftType);
       const selectedAircraft = aircraft.find(a => a.id === selectedAircraftId);
+      info(`[FLIGHT-ACADEMY] Найденный самолёт: ${selectedAircraft ? selectedAircraft.name : 'не найден'}`);
 
       if (!selectedAircraft) {
         await interaction.reply({
@@ -911,8 +936,11 @@ export async function handleAircraftSelect(interaction: any) {
       info(`[FLIGHT-ACADEMY] Пользователь ${interaction.user.tag} выбрал самолёт: ${selectedAircraft.name}`);
 
       // Создаём модальное окно для заполнения формы
+      const modalCustomId = `academy_form_${licenseId}_${selectedAircraftId}`;
+      info(`[FLIGHT-ACADEMY] Создаём модальное окно с customId: ${modalCustomId}`);
+      
       const modal = new ModalBuilder()
-        .setCustomId(`academy_form_${licenseId}_${selectedAircraftId}`)
+        .setCustomId(modalCustomId)
         .setTitle(`${license.name} - ${selectedAircraft.name}`);
 
       const experienceInput = new TextInputBuilder()
