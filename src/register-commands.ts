@@ -98,6 +98,75 @@ const commands = [
     .setDescription("Запустить тестирование бота (только для администраторов)")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
+    .setName("aircraft-list")
+    .setDescription("Показать списки самолётов для лётной академии")
+    .addStringOption((option) =>
+      option
+        .setName("type")
+        .setDescription("Тип самолётов")
+        .setRequired(false)
+        .addChoices(
+          { name: "Поршневые", value: "piston" },
+          { name: "Ранние реактивные", value: "early_jet" },
+          { name: "Современные реактивные", value: "modern_jet" }
+        )
+    ),
+  new SlashCommandBuilder()
+    .setName("aircraft-add")
+    .setDescription("Добавить самолёт в список (только для администраторов самолётов)")
+    .addStringOption((option) =>
+      option
+        .setName("type")
+        .setDescription("Тип самолёта")
+        .setRequired(true)
+        .addChoices(
+          { name: "Поршневой", value: "piston" },
+          { name: "Ранний реактивный", value: "early_jet" },
+          { name: "Современный реактивный", value: "modern_jet" }
+        )
+    )
+    .addStringOption((option) =>
+      option
+        .setName("id")
+        .setDescription("Уникальный ID самолёта (например: bf109f4)")
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("name")
+        .setDescription("Название самолёта")
+        .setRequired(true)
+    )
+    .addNumberOption((option) =>
+      option
+        .setName("br")
+        .setDescription("Боевой рейтинг")
+        .setRequired(true)
+        .setMinValue(1.0)
+        .setMaxValue(12.0)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("nation")
+        .setDescription("Нация")
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("aircraft_type")
+        .setDescription("Тип самолёта")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("aircraft-remove")
+    .setDescription("Удалить самолёт из списка (только для администраторов самолётов)")
+    .addStringOption((option) =>
+      option
+        .setName("id")
+        .setDescription("ID самолёта для удаления")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
     .setName("flight-academy")
     .setDescription("Создать тикет для лётной академии War Thunder")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),

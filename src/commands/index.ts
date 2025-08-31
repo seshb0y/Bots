@@ -15,6 +15,7 @@ import { simpleTestCommand } from "./simple-test";
 import { lichstatCommand } from "./lichstat";
 import { runtestsCommand } from "./runtests";
 import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal } from "./flight-academy";
+import { handleAircraftList, handleAircraftAdd, handleAircraftRemove } from "./aircraft";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error } from "../utils/logger";
 import { checkPermission } from "../utils/permissions";
@@ -188,6 +189,15 @@ export function setupCommands(client: Client) {
             break;
           case "flight-academy":
             await flightAcademyCommand(interaction);
+            break;
+          case "aircraft-list":
+            await handleAircraftList(interaction);
+            break;
+          case "aircraft-add":
+            await handleAircraftAdd(interaction);
+            break;
+          case "aircraft-remove":
+            await handleAircraftRemove(interaction);
             break;
           case "ping":
             await interaction.reply({ content: "🏓 Понг! Бот работает.", ephemeral: true });
