@@ -17,7 +17,7 @@ import { runtestsCommand } from "./runtests";
 import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal, handleAircraftSelect as flightAcademyAircraftSelect } from "./flight-academy";
 import { aircraftListCommand, aircraftAddCommand, aircraftRemoveCommand, aircraftUpdateCommand, handleAircraftTypeSelect, handleAircraftListBack } from "./aircraft";
 import { setPbAnnounced } from "../utils/pbNotify";
-import { logCommand, logInteraction, error } from "../utils/logger";
+import { logCommand, logInteraction, error, info } from "../utils/logger";
 import { checkPermission } from "../utils/permissions";
 
 export {
@@ -138,6 +138,10 @@ export function setupCommands(client: Client) {
       // --- обработка команд ---
       if (interaction.isChatInputCommand()) {
         const commandName = interaction.commandName;
+        info(`[COMMAND] === НАЧАЛО ОБРАБОТКИ КОМАНДЫ ===`);
+        info(`[COMMAND] Название команды: ${commandName}`);
+        info(`[COMMAND] Пользователь: ${interaction.user.tag} (${interaction.user.id})`);
+        info(`[COMMAND] Сервер: ${interaction.guildId}`);
         logCommand(`Выполняется команда: ${commandName}`, { 
           userId: interaction.user.id, 
           username: interaction.user.tag,
@@ -196,9 +200,11 @@ export function setupCommands(client: Client) {
           case "flight-academy":
             await flightAcademyCommand(interaction);
             break;
-          case "aircraft-list":
-            await aircraftListCommand(interaction);
-            break;
+                  case "aircraft-list":
+          info(`[COMMAND] Выполняется команда aircraft-list для пользователя ${interaction.user.tag}`);
+          await aircraftListCommand(interaction);
+          info(`[COMMAND] Команда aircraft-list завершена для пользователя ${interaction.user.tag}`);
+          break;
           case "aircraft-add":
             await aircraftAddCommand(interaction);
             break;
@@ -214,12 +220,13 @@ export function setupCommands(client: Client) {
           case "simpletest":
             await simpleTestCommand(interaction);
             break;
-          default:
-            logCommand(`Неизвестная команда: ${commandName}`, { 
-              userId: interaction.user.id, 
-              username: interaction.user.tag 
-            });
-            await interaction.reply({ content: "Неизвестная команда!", ephemeral: true });
+                  default:
+          info(`[COMMAND] Команда ${commandName} не найдена в обработчике`);
+          logCommand(`Неизвестная команда: ${commandName}`, { 
+            userId: interaction.user.id, 
+            username: interaction.user.tag 
+          });
+          await interaction.reply({ content: "❌ Неизвестная команда!", ephemeral: true });
         }
       }
       
