@@ -28,10 +28,10 @@ export const COMMAND_PERMISSIONS = {
   public: ["help", "ping", "lichstat"],
   
   // Команды доступные модераторам и выше
-  moderator: ["points", "addtracer", "removetracer", "listtraced", "stats", "simpletest", "flight-academy"],
+  moderator: ["points", "addtracer", "removetracer", "listtraced", "stats", "simpletest", "flight-academy", "aircraft-list"],
   
   // Команды доступные только офицерам
-  officer: ["syncclan", "resettleavers", "pbnotify", "resources", "checktracked", "teststats"],
+  officer: ["syncclan", "resettleavers", "pbnotify", "resources", "checktracked", "teststats", "aircraft-add", "aircraft-remove", "aircraft-update"],
   
   // Команды доступные только администраторам
   admin: ["runtests"]

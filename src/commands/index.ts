@@ -149,11 +149,15 @@ export function setupCommands(client: Client) {
         });
 
         // Проверяем разрешения пользователя
+        info(`[COMMAND] Проверяем разрешения для пользователя ${interaction.user.tag}`);
         const hasAccess = await checkPermission(interaction);
+        info(`[COMMAND] Результат проверки разрешений: ${hasAccess}`);
         if (!hasAccess) {
+          info(`[COMMAND] Доступ запрещён, выходим`);
           return;
         }
 
+        info(`[COMMAND] Переходим к switch statement для команды: ${commandName}`);
         switch (commandName) {
           case "help":
             await helpCommand(interaction);
@@ -201,6 +205,7 @@ export function setupCommands(client: Client) {
             await flightAcademyCommand(interaction);
             break;
         case "aircraft-list":
+          info(`[COMMAND] 🎯 ПОПАЛИ В CASE aircraft-list для пользователя ${interaction.user.tag}`);
           info(`[COMMAND] Выполняется команда aircraft-list для пользователя ${interaction.user.tag}`);
           await aircraftListCommand(interaction);
           info(`[COMMAND] Команда aircraft-list завершена для пользователя ${interaction.user.tag}`);
@@ -221,6 +226,7 @@ export function setupCommands(client: Client) {
             await simpleTestCommand(interaction);
             break;
         default:
+          info(`[COMMAND] 🚫 ПОПАЛИ В DEFAULT CASE для команды: ${commandName}`);
           info(`[COMMAND] Команда ${commandName} не найдена в обработчике`);
           logCommand(`Неизвестная команда: ${commandName}`, { 
             userId: interaction.user.id, 
@@ -228,6 +234,7 @@ export function setupCommands(client: Client) {
           });
           await interaction.reply({ content: "❌ Неизвестная команда!", ephemeral: true });
         }
+        info(`[COMMAND] Switch statement завершён для команды: ${commandName}`);
       }
       
       // --- обработка модальных окон ---
