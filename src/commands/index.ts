@@ -14,8 +14,8 @@ import { checktrackedCommand } from "./checktracked";
 import { simpleTestCommand } from "./simple-test";
 import { lichstatCommand } from "./lichstat";
 import { runtestsCommand } from "./runtests";
-import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal } from "./flight-academy";
-import { handleAircraftList, handleAircraftAdd, handleAircraftRemove } from "./aircraft";
+import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal, handleAircraftSelect as flightAcademyAircraftSelect } from "./flight-academy";
+import { aircraftListCommand, aircraftAddCommand, aircraftRemoveCommand, aircraftUpdateCommand, handleAircraftTypeSelect, handleAircraftListBack } from "./aircraft";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error } from "../utils/logger";
 import { checkPermission } from "../utils/permissions";
@@ -48,6 +48,12 @@ export function setupCommands(client: Client) {
             interaction.customId.startsWith("training_") || 
             interaction.customId.startsWith("close_ticket_")) {
           await flightAcademyButton(interaction);
+          return;
+        }
+
+        // Обработка кнопок управления самолётами
+        if (interaction.customId === "aircraft_list_back") {
+          await handleAircraftListBack(interaction);
           return;
         }
         
@@ -191,13 +197,16 @@ export function setupCommands(client: Client) {
             await flightAcademyCommand(interaction);
             break;
           case "aircraft-list":
-            await handleAircraftList(interaction);
+            await aircraftListCommand(interaction);
             break;
           case "aircraft-add":
-            await handleAircraftAdd(interaction);
+            await aircraftAddCommand(interaction);
             break;
           case "aircraft-remove":
-            await handleAircraftRemove(interaction);
+            await aircraftRemoveCommand(interaction);
+            break;
+          case "aircraft-update":
+            await aircraftUpdateCommand(interaction);
             break;
           case "ping":
             await interaction.reply({ content: "🏓 Понг! Бот работает.", ephemeral: true });
@@ -218,6 +227,18 @@ export function setupCommands(client: Client) {
       if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith("academy_form_") || interaction.customId.startsWith("training_form_")) {
           await flightAcademyModal(interaction);
+          return;
+        }
+      }
+
+      // --- обработка селекторов ---
+      if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith("aircraft_select_")) {
+          await flightAcademyAircraftSelect(interaction);
+          return;
+        }
+        if (interaction.customId === "aircraft_type_select") {
+          await handleAircraftTypeSelect(interaction);
           return;
         }
       }

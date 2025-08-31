@@ -99,72 +99,128 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("aircraft-list")
-    .setDescription("Показать списки самолётов для лётной академии")
+    .setDescription("Показать список самолётов")
     .addStringOption((option) =>
       option
-        .setName("type")
+        .setName("тип")
         .setDescription("Тип самолётов")
         .setRequired(false)
         .addChoices(
-          { name: "Поршневые", value: "piston" },
-          { name: "Ранние реактивные", value: "early_jet" },
-          { name: "Современные реактивные", value: "modern_jet" }
+          { name: "Поршневая авиация", value: "piston" },
+          { name: "Ранние реактивы", value: "early_jet" },
+          { name: "Современные реактивы", value: "modern_jet" }
         )
     ),
   new SlashCommandBuilder()
     .setName("aircraft-add")
-    .setDescription("Добавить самолёт в список (только для администраторов самолётов)")
+    .setDescription("Добавить самолёт в список")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption((option) =>
       option
-        .setName("type")
+        .setName("тип")
         .setDescription("Тип самолёта")
         .setRequired(true)
         .addChoices(
-          { name: "Поршневой", value: "piston" },
-          { name: "Ранний реактивный", value: "early_jet" },
-          { name: "Современный реактивный", value: "modern_jet" }
+          { name: "Поршневая авиация", value: "piston" },
+          { name: "Ранние реактивы", value: "early_jet" },
+          { name: "Современные реактивы", value: "modern_jet" }
         )
     )
     .addStringOption((option) =>
       option
-        .setName("id")
-        .setDescription("Уникальный ID самолёта (например: bf109f4)")
-        .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("name")
+        .setName("название")
         .setDescription("Название самолёта")
         .setRequired(true)
     )
-    .addNumberOption((option) =>
+    .addStringOption((option) =>
       option
-        .setName("br")
+        .setName("бр")
         .setDescription("Боевой рейтинг")
         .setRequired(true)
-        .setMinValue(1.0)
-        .setMaxValue(12.0)
     )
     .addStringOption((option) =>
       option
-        .setName("nation")
-        .setDescription("Нация")
+        .setName("нация")
+        .setDescription("Нация самолёта")
         .setRequired(true)
     )
     .addStringOption((option) =>
       option
-        .setName("aircraft_type")
-        .setDescription("Тип самолёта")
-        .setRequired(true)
+        .setName("описание")
+        .setDescription("Описание самолёта")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("id")
+        .setDescription("Уникальный ID самолёта")
+        .setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("aircraft-remove")
-    .setDescription("Удалить самолёт из списка (только для администраторов самолётов)")
+    .setDescription("Удалить самолёт из списка")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((option) =>
+      option
+        .setName("тип")
+        .setDescription("Тип самолёта")
+        .setRequired(true)
+        .addChoices(
+          { name: "Поршневая авиация", value: "piston" },
+          { name: "Ранние реактивы", value: "early_jet" },
+          { name: "Современные реактивы", value: "modern_jet" }
+        )
+    )
     .addStringOption((option) =>
       option
         .setName("id")
         .setDescription("ID самолёта для удаления")
         .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("aircraft-update")
+    .setDescription("Обновить информацию о самолёте")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((option) =>
+      option
+        .setName("тип")
+        .setDescription("Тип самолёта")
+        .setRequired(true)
+        .addChoices(
+          { name: "Поршневая авиация", value: "piston" },
+          { name: "Ранние реактивы", value: "early_jet" },
+          { name: "Современные реактивы", value: "modern_jet" }
+        )
+    )
+    .addStringOption((option) =>
+      option
+        .setName("id")
+        .setDescription("ID самолёта для обновления")
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("название")
+        .setDescription("Новое название самолёта")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("бр")
+        .setDescription("Новый боевой рейтинг")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("нация")
+        .setDescription("Новая нация самолёта")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("описание")
+        .setDescription("Новое описание самолёта")
+        .setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("flight-academy")

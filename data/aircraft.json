@@ -1,127 +1,80 @@
 {
   "piston": [
     {
-      "id": "bf109f4",
+      "id": "bf109_f4",
       "name": "Bf 109 F-4",
-      "br": 4.3,
+      "type": "piston",
+      "br": "4.3",
       "nation": "Германия",
-      "type": "Истребитель"
+      "description": "Отличный истребитель для дуэлей"
     },
     {
-      "id": "spitfiremk5b",
+      "id": "spitfire_mk5b",
       "name": "Spitfire Mk.Vb",
-      "br": 4.3,
+      "type": "piston",
+      "br": "4.7",
       "nation": "Великобритания",
-      "type": "Истребитель"
+      "description": "Манёвренный истребитель"
     },
     {
-      "id": "p51d5",
-      "name": "P-51D-5",
-      "br": 4.7,
+      "id": "p51d30",
+      "name": "P-51D-30",
+      "type": "piston",
+      "br": "5.0",
       "nation": "США",
-      "type": "Истребитель"
-    },
-    {
-      "id": "yak9k",
-      "name": "Як-9К",
-      "br": 4.7,
-      "nation": "СССР",
-      "type": "Истребитель"
-    },
-    {
-      "id": "fw190a5",
-      "name": "Fw 190 A-5",
-      "br": 5.0,
-      "nation": "Германия",
-      "type": "Истребитель"
-    },
-    {
-      "id": "la7",
-      "name": "Ла-7",
-      "br": 5.7,
-      "nation": "СССР",
-      "type": "Истребитель"
-    },
-    {
-      "id": "p47d25",
-      "name": "P-47D-25",
-      "br": 5.7,
-      "nation": "США",
-      "type": "Истребитель"
+      "description": "Универсальный истребитель"
     }
   ],
   "early_jet": [
     {
-      "id": "me262a1a",
-      "name": "Me 262 A-1a",
-      "br": 7.0,
+      "id": "me262_a1",
+      "name": "Me 262 A-1",
+      "type": "early_jet",
+      "br": "7.7",
       "nation": "Германия",
-      "type": "Реактивный истребитель"
-    },
-    {
-      "id": "f80a5",
-      "name": "F-80A-5",
-      "br": 7.0,
-      "nation": "США",
-      "type": "Реактивный истребитель"
+      "description": "Первый реактивный истребитель"
     },
     {
       "id": "mig15",
-      "name": "МиГ-15",
-      "br": 8.3,
+      "name": "MiG-15",
+      "type": "early_jet",
+      "br": "8.7",
       "nation": "СССР",
-      "type": "Реактивный истребитель"
+      "description": "Отличный реактивный истребитель"
     },
     {
-      "id": "f86a5",
-      "name": "F-86A-5",
+      "id": "f86f2",
+      "name": "F-86F-2",
+      "type": "early_jet",
       "br": "8.7",
       "nation": "США",
-      "type": "Реактивный истребитель"
-    },
-    {
-      "id": "meteormk3",
-      "name": "Meteor Mk.3",
-      "br": 7.7,
-      "nation": "Великобритания",
-      "type": "Реактивный истребитель"
+      "description": "Американский реактивный истребитель"
     }
   ],
   "modern_jet": [
     {
       "id": "mig21bis",
-      "name": "МиГ-21бис",
-      "br": 10.3,
+      "name": "MiG-21bis",
+      "type": "modern_jet",
+      "br": "10.3",
       "nation": "СССР",
-      "type": "Современный истребитель"
+      "description": "Современный реактивный истребитель"
     },
     {
-      "id": "f4c",
-      "name": "F-4C Phantom II",
-      "br": 10.0,
+      "id": "f4e",
+      "name": "F-4E Phantom II",
+      "type": "modern_jet",
+      "br": "11.0",
       "nation": "США",
-      "type": "Современный истребитель"
+      "description": "Многоцелевой истребитель"
     },
     {
-      "id": "mirage3e",
-      "name": "Mirage IIIE",
-      "br": 10.3,
-      "nation": "Франция",
-      "type": "Современный истребитель"
-    },
-    {
-      "id": "f104g",
-      "name": "F-104G Starfighter",
-      "br": 10.3,
-      "nation": "Германия",
-      "type": "Современный истребитель"
-    },
-    {
-      "id": "j35d",
-      "name": "J 35D Draken",
-      "br": 10.3,
-      "nation": "Швеция",
-      "type": "Современный истребитель"
+      "id": "su27",
+      "name": "Su-27",
+      "type": "modern_jet",
+      "br": "12.0",
+      "nation": "СССР",
+      "description": "Современный тяжёлый истребитель"
     }
   ]
 }
