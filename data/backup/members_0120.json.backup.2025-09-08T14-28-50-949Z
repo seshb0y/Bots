@@ -1,0 +1,14 @@
+[
+  {
+    "nick": "TestPlayer1",
+    "points": 1000
+  },
+  {
+    "nick": "TestPlayer2",
+    "points": 1500
+  },
+  {
+    "nick": "TestPlayer3",
+    "points": 2000
+  }
+]

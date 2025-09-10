@@ -1,4 +1,5 @@
 [
+<<<<<<< HEAD
     {
       "nick": "Pirat_Blue_Beard",
       "points": 0
@@ -488,3 +489,14 @@
       "points": 0
     }
   ]
+=======
+  {
+    "nick": "ConsistencyTest1",
+    "points": 1000
+  },
+  {
+    "nick": "ConsistencyTest2",
+    "points": 1500
+  }
+]
+>>>>>>> feature/absence-thread-integration

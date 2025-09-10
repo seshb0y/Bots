@@ -1,10 +1,18 @@
 import { ChatInputCommandInteraction, GuildMember } from "discord.js";
+<<<<<<< HEAD
 import { ADMIN_ROLE_IDS, MODERATOR_ROLE_IDS, COMMAND_PERMISSIONS } from "../constants";
+=======
+import { ADMIN_ROLE_IDS, MODERATOR_ROLE_IDS, PILOT_INSTRUCTOR_ROLE_IDS, COMMAND_PERMISSIONS } from "../constants";
+>>>>>>> feature/absence-thread-integration
 
 /**
  * Проверяет, имеет ли пользователь необходимые роли для выполнения команды
  */
+<<<<<<< HEAD
 export function hasPermission(interaction: ChatInputCommandInteraction, requiredLevel: 'public' | 'moderator' | 'officer' | 'admin'): boolean {
+=======
+export function hasPermission(interaction: ChatInputCommandInteraction, requiredLevel: 'public' | 'pilot_instructor' | 'moderator' | 'officer' | 'admin'): boolean {
+>>>>>>> feature/absence-thread-integration
   const member = interaction.member as GuildMember;
   const commandName = interaction.commandName;
 
@@ -23,8 +31,18 @@ export function hasPermission(interaction: ChatInputCommandInteraction, required
   const userRoleIds = member.roles.cache.map(role => role.id);
 
   switch (requiredLevel) {
+<<<<<<< HEAD
     case 'moderator':
       return userRoleIds.some(roleId => MODERATOR_ROLE_IDS.includes(roleId));
+=======
+    case 'pilot_instructor':
+      return userRoleIds.some(roleId => PILOT_INSTRUCTOR_ROLE_IDS.includes(roleId)) ||
+             userRoleIds.some(roleId => MODERATOR_ROLE_IDS.includes(roleId)) ||
+             userRoleIds.some(roleId => ADMIN_ROLE_IDS.includes(roleId));
+    case 'moderator':
+      return userRoleIds.some(roleId => MODERATOR_ROLE_IDS.includes(roleId)) ||
+             userRoleIds.some(roleId => ADMIN_ROLE_IDS.includes(roleId));
+>>>>>>> feature/absence-thread-integration
     case 'officer':
       return userRoleIds.some(roleId => ADMIN_ROLE_IDS.includes(roleId));
     case 'admin':
@@ -37,10 +55,17 @@ export function hasPermission(interaction: ChatInputCommandInteraction, required
 /**
  * Получает минимальный уровень доступа для команды
  */
+<<<<<<< HEAD
 export function getCommandPermissionLevel(commandName: string): 'public' | 'moderator' | 'officer' | 'admin' | null {
   for (const [level, commands] of Object.entries(COMMAND_PERMISSIONS)) {
     if (commands.includes(commandName)) {
       return level as 'public' | 'moderator' | 'officer' | 'admin';
+=======
+export function getCommandPermissionLevel(commandName: string): 'public' | 'pilot_instructor' | 'moderator' | 'officer' | 'admin' | null {
+  for (const [level, commands] of Object.entries(COMMAND_PERMISSIONS)) {
+    if (commands.includes(commandName)) {
+      return level as 'public' | 'pilot_instructor' | 'moderator' | 'officer' | 'admin';
+>>>>>>> feature/absence-thread-integration
     }
   }
   return null;
@@ -64,6 +89,10 @@ export async function checkPermission(interaction: ChatInputCommandInteraction):
   if (!hasPermission(interaction, permissionLevel)) {
     const levelNames = {
       'public': 'всем пользователям',
+<<<<<<< HEAD
+=======
+      'pilot_instructor': 'пилотам-инструкторам и выше',
+>>>>>>> feature/absence-thread-integration
       'moderator': 'модераторам и выше',
       'officer': 'офицерам',
       'admin': 'администраторам'

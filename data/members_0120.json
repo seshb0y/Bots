@@ -1,5 +1,6 @@
 [
   {
+<<<<<<< HEAD
     "nick": "Pirat_Blue_Beard",
     "points": 0
   },
@@ -458,5 +459,17 @@
   {
     "nick": "xXDimasikXx",
     "points": 487
+=======
+    "nick": "TestPlayer1",
+    "points": 1000
+  },
+  {
+    "nick": "TestPlayer2",
+    "points": 1500
+  },
+  {
+    "nick": "TestPlayer3",
+    "points": 2000
+>>>>>>> feature/absence-thread-integration
   }
 ]

@@ -14,9 +14,15 @@ import {
   ChannelType,
   StringSelectMenuBuilder,
 } from "discord.js";
+<<<<<<< HEAD
 import { info, error } from "../utils/logger.js";
 import { FLIGHT_ACADEMY_CHANNEL_ID, FLIGHT_ACADEMY_NOTIFY_USER_ID, FLIGHT_ACADEMY_OFFICER_ROLE_IDS } from "../constants.js";
 import { getAircraftByType, getAircraftTypeByLicenseId, getAircraftTypeBySkillId, createAircraftOptions } from "../utils/aircraft.js";
+=======
+import { info, error } from "../utils/logger";
+import { FLIGHT_ACADEMY_CHANNEL_ID, FLIGHT_ACADEMY_NOTIFY_USER_ID, FLIGHT_ACADEMY_OFFICER_ROLE_IDS } from "../constants";
+import { getAircraftByType, getAircraftTypeByLicenseId, getAircraftTypeBySkillId, createAircraftOptions } from "../utils/aircraft";
+>>>>>>> feature/absence-thread-integration
 
 // Функция для получения отображаемого имени пользователя на сервере
 function getUserDisplayName(interaction: any): string {
@@ -487,7 +493,68 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
       return;
     }
 
+<<<<<<< HEAD
     // Обработка закрытия тикета
+=======
+    // Обработка закрытия тикета обучения навыкам
+    if (interaction.customId === "close_training_ticket") {
+      try {
+        info(`[FLIGHT-ACADEMY] Пользователь ${interaction.user.tag} закрывает тикет обучения навыкам`);
+        
+        const channel = interaction.channel;
+        if (!channel || !channel.isTextBased()) {
+          await interaction.reply({
+            content: "❌ Не удалось найти канал для закрытия",
+            ephemeral: true
+          });
+          return;
+        }
+
+        // Проверяем права на закрытие тикета
+        if (interaction.user.id !== FLIGHT_ACADEMY_NOTIFY_USER_ID && 
+            !(interaction.member?.roles instanceof Array ? 
+              interaction.member.roles.includes(FLIGHT_ACADEMY_OFFICER_ROLE_IDS[0]) :
+              interaction.member?.roles.cache.has(FLIGHT_ACADEMY_OFFICER_ROLE_IDS[0]))) {
+          await interaction.reply({
+            content: "❌ У вас нет прав для закрытия этого тикета",
+            ephemeral: true
+          });
+          return;
+        }
+
+        // Создаём embed с подтверждением закрытия
+        const closeEmbed = new EmbedBuilder()
+          .setTitle("🔒 Тикет закрыт")
+          .setDescription(`Тикет обучения навыкам закрыт пользователем ${interaction.user}`)
+          .setColor(0xff0000)
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [closeEmbed] });
+
+        // Удаляем канал через 5 секунд
+        setTimeout(async () => {
+          try {
+            await channel.delete();
+            info(`[FLIGHT-ACADEMY] Канал-тикет обучения навыкам ${'name' in channel ? channel.name : channel.id} удалён`);
+          } catch (deleteError) {
+            error(`[FLIGHT-ACADEMY] Ошибка при удалении канала-тикета:`, deleteError);
+          }
+        }, 5000);
+
+        info(`[FLIGHT-ACADEMY] Тикет обучения навыкам ${'name' in channel ? channel.name : channel.id} закрыт пользователем ${interaction.user.tag}`);
+
+      } catch (closeError) {
+        error(`[FLIGHT-ACADEMY] Ошибка при закрытии тикета обучения навыкам:`, closeError);
+        await interaction.reply({
+          content: "❌ Произошла ошибка при закрытии тикета",
+          ephemeral: true
+        });
+      }
+      return;
+    }
+
+    // Обработка закрытия тикета лицензии
+>>>>>>> feature/absence-thread-integration
     if (interaction.customId.startsWith("close_ticket_")) {
       try {
         info(`[FLIGHT-ACADEMY] Пользователь ${interaction.user.tag} закрывает тикет`);
@@ -702,7 +769,11 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         selectedAircraft = aircraft.find(a => a.name === aircraftName);
         
         if (selectedAircraft) {
+<<<<<<< HEAD
           info(`[FLIGHT-ACADEMY] Самолёт найден: ${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})`);
+=======
+          info(`[FLIGHT-ACADEMY] Самолёт найден: ${selectedAircraft.name}`);
+>>>>>>> feature/absence-thread-integration
         } else {
           info(`[FLIGHT-ACADEMY] Самолёт "${aircraftName}" не найден в списке ${aircraftType}`);
           info(`[FLIGHT-ACADEMY] Доступные самолёты: ${aircraft.map(a => a.name).join(", ")}`);
@@ -726,7 +797,11 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
       // Добавляем информацию о выбранном самолёте, если есть
       if (selectedAircraft) {
         applicationEmbed.addFields(
+<<<<<<< HEAD
           { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})`, inline: false }
+=======
+          { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name}`, inline: false }
+>>>>>>> feature/absence-thread-integration
         );
       }
 
@@ -751,18 +826,35 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
           // parent: FLIGHT_ACADEMY_TICKET_CATEGORY_ID, // Временно убираем категорию
           permissionOverwrites: [
             {
+<<<<<<< HEAD
               id: guild.id, // @everyone
+=======
+              id: guild.id, // @everyone - запрещаем всем видеть канал
+>>>>>>> feature/absence-thread-integration
               deny: [PermissionFlagsBits.ViewChannel]
             },
             {
               id: interaction.user.id, // Создатель тикета
               allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
             },
+<<<<<<< HEAD
             // Добавляем права для офицеров
             ...FLIGHT_ACADEMY_OFFICER_ROLE_IDS.map((roleId: string) => ({
               id: roleId,
               allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
             }))
+=======
+            // Добавляем права для лётного инструктора по роли
+            ...FLIGHT_ACADEMY_OFFICER_ROLE_IDS.map((roleId: string) => ({
+              id: roleId,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
+            })),
+            // Добавляем права для лётного инструктора по пользователю (на случай если нет роли)
+            {
+              id: FLIGHT_ACADEMY_NOTIFY_USER_ID,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
+            }
+>>>>>>> feature/absence-thread-integration
           ]
         });
 
@@ -783,7 +875,11 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         // Добавляем информацию о выбранном самолёте, если есть
         if (selectedAircraft) {
           ticketEmbed.addFields(
+<<<<<<< HEAD
             { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})`, inline: false }
+=======
+            { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name}`, inline: false }
+>>>>>>> feature/absence-thread-integration
           );
         }
 
@@ -802,6 +898,27 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         // Отправляем заявку в тикет
         await ticketChannel.send({ embeds: [ticketEmbed], components: [closeButton] });
         
+<<<<<<< HEAD
+=======
+        // Отправляем уведомление лётному инструктору в канал-тикет
+        const instructorNotification = new EmbedBuilder()
+          .setTitle("🎓 Новый тикет лётной академии")
+          .setDescription(`Создан новый тикет для получения лицензии **${license.name}**`)
+          .setColor(0x00ff00)
+          .addFields(
+            { name: "👤 Студент", value: `${interaction.user} (${interaction.user.tag})`, inline: true },
+            { name: "📋 Лицензия", value: license.name, inline: true },
+            { name: "⏰ Время создания", value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+          )
+          .setFooter({ text: "Лётная академия War Thunder" })
+          .setTimestamp();
+
+        await ticketChannel.send({ 
+          content: `<@${FLIGHT_ACADEMY_NOTIFY_USER_ID}>`, 
+          embeds: [instructorNotification] 
+        });
+        
+>>>>>>> feature/absence-thread-integration
         // Подтверждаем пользователю
         info(`[FLIGHT-ACADEMY] Отправляем подтверждение пользователю ${interaction.user.tag}`);
         await interaction.reply({
@@ -857,6 +974,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         )
         .setFooter({ text: "Лётная академия War Thunder - Обучение навыкам" });
 
+<<<<<<< HEAD
       // Отправляем уведомление в личные сообщения
       try {
         info(`[FLIGHT-ACADEMY] Отправляем уведомление пользователю ${FLIGHT_ACADEMY_NOTIFY_USER_ID}`);
@@ -864,20 +982,105 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         info(`[FLIGHT-ACADEMY] Пользователь найден: ${user.tag}`);
         await user.send({ embeds: [trainingEmbed] });
         info(`[FLIGHT-ACADEMY] DM отправлен пользователю ${user.tag}`);
+=======
+      // Создаём канал-тикет для обучения навыкам
+      try {
+        const guild = interaction.guild;
+        if (!guild) {
+          throw new Error("Не удалось получить информацию о сервере");
+        }
+
+        // Создаём название канала
+        const channelName = `🎯-навык-${interaction.user.username}-${Date.now().toString().slice(-4)}`;
+        
+        // Создаём канал
+        const ticketChannel = await guild.channels.create({
+          name: channelName,
+          type: ChannelType.GuildText,
+          // parent: FLIGHT_ACADEMY_TICKET_CATEGORY_ID, // Временно убираем категорию
+          permissionOverwrites: [
+            {
+              id: guild.id, // @everyone - запрещаем всем видеть канал
+              deny: [PermissionFlagsBits.ViewChannel]
+            },
+            {
+              id: interaction.user.id, // Создатель тикета
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+            },
+            // Добавляем права для лётного инструктора по роли
+            ...FLIGHT_ACADEMY_OFFICER_ROLE_IDS.map((roleId: string) => ({
+              id: roleId,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
+            })),
+            // Добавляем права для лётного инструктора по пользователю (на случай если нет роли)
+            {
+              id: FLIGHT_ACADEMY_NOTIFY_USER_ID,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
+            }
+          ]
+        });
+
+        info(`[FLIGHT-ACADEMY] Канал-тикет обучения навыкам создан: ${ticketChannel.name}`);
+
+        // Отправляем embed с заявкой в тикет
+        const ticketEmbed = new EmbedBuilder()
+          .setTitle("🎯 Заявка на обучение навыку")
+          .setColor(0x0099ff)
+          .addFields(
+            { name: "👤 Пользователь Discord", value: `${getUserDisplayName(interaction)} (${interaction.user.id})`, inline: true },
+            { name: "🎯 Навык", value: `${skill.name}`, inline: true },
+            { name: "📚 Опыт", value: experience, inline: false },
+            { name: "🔍 Текущий уровень", value: currentSkill, inline: false },
+            { name: "🎯 Цели обучения", value: goals, inline: false },
+            { name: "📊 Информация о навыке", value: `**Сложность:** ${skill.difficulty}\n**БР:** ${skill.brRange}\n**Требования:** ${skill.requirements.join(", ")}`, inline: false }
+          )
+          .setFooter({ text: "Лётная академия War Thunder - Обучение навыкам" });
+
+        // Отправляем embed в канал-тикет
+        await ticketChannel.send({ 
+          content: `<@${FLIGHT_ACADEMY_NOTIFY_USER_ID}> новая заявка на обучение навыку!`,
+          embeds: [ticketEmbed] 
+        });
+
+        // Добавляем кнопку закрытия тикета
+        const closeButton = new ButtonBuilder()
+          .setCustomId("close_training_ticket")
+          .setLabel("🔒 Закрыть тикет")
+          .setStyle(ButtonStyle.Danger);
+
+        const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(closeButton);
+        await ticketChannel.send({ 
+          content: "Используйте кнопку ниже для закрытия тикета:",
+          components: [buttonRow] 
+        });
+
+        info(`[FLIGHT-ACADEMY] Embed и кнопка отправлены в канал-тикет ${ticketChannel.name}`);
+>>>>>>> feature/absence-thread-integration
         
         // Подтверждаем пользователю
         info(`[FLIGHT-ACADEMY] Отправляем подтверждение пользователю ${interaction.user.tag}`);
         await interaction.reply({
+<<<<<<< HEAD
           content: `✅ Ваша заявка на обучение навыку **${skill.name}** успешно отправлена! Ожидайте ответа в личных сообщениях.`,
+=======
+          content: `✅ Ваша заявка на обучение навыку **${skill.name}** успешно отправлена! Общение будет происходить в канале-тикете ${ticketChannel}.`,
+>>>>>>> feature/absence-thread-integration
           ephemeral: true
         });
 
         info(`[FLIGHT-ACADEMY] Заявка на обучение навыку ${skill.name} от ${interaction.user.tag} успешно обработана`);
 
+<<<<<<< HEAD
       } catch (dmError) {
         error(`[FLIGHT-ACADEMY] Ошибка при отправке DM для заявки на обучение навыку ${skill.name}:`, dmError);
         await interaction.reply({
           content: "❌ Произошла ошибка при отправке заявки. Попробуйте позже или обратитесь к администратору.",
+=======
+      } catch (channelError) {
+        error(`[FLIGHT-ACADEMY] Ошибка при создании канала-тикета для заявки на обучение навыку ${skill.name}:`, channelError);
+        await interaction.reply({
+          content: "❌ Произошла ошибка при создании канала-тикета. Попробуйте позже или обратитесь к администратору.",
+>>>>>>> feature/absence-thread-integration
           ephemeral: true
         });
       }

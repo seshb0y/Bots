@@ -7,6 +7,13 @@ import {
   User,
   TextChannel,
   Guild,
+<<<<<<< HEAD
+=======
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+>>>>>>> feature/absence-thread-integration
 } from "discord.js";
 import { config } from "dotenv";
 import {
@@ -21,8 +28,11 @@ import { loadJson, saveJson } from "./utils/json";
 import { UserData, TrackedPlayer } from "./types";
 import { pbNotifyScheduler, autoPbAnnounceScheduler } from "./utils/pbNotify";
 import {
+<<<<<<< HEAD
   saveMembersAtTime,
   loadMembersAtTime,
+=======
+>>>>>>> feature/absence-thread-integration
   fetchClanPoints,
   saveMembersAlternating,
   saveCurrentMembers,
@@ -38,6 +48,10 @@ import {
 } from "./utils/leaderboard";
 import { normalize } from "./utils/normalize";
 import { trackFunctionPerformance } from "./commands/resources";
+<<<<<<< HEAD
+=======
+import { autoTestService } from "./tests/autoTestService";
+>>>>>>> feature/absence-thread-integration
 import { 
   info, 
   warn, 
@@ -154,6 +168,63 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
   const oldChannelId = oldState.channelId;
   const newChannelId = newState.channelId;
   const guild = oldState.guild || newState.guild;
+<<<<<<< HEAD
+=======
+  
+  // Обработка входа в канал отсутствий
+  const ABSENCE_CHANNEL_ID = "821790755486957579";
+  if (newChannelId === ABSENCE_CHANNEL_ID && !oldChannelId) {
+    try {
+      const member = newState.member;
+      if (member && !member.user.bot) {
+        // Отправляем личное сообщение с формой
+        const embed = new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle("📝 Форма отписки отсутствия")
+          .setDescription(
+            "Добро пожаловать в канал отписок отсутствия!\n\n" +
+            "Нажмите кнопку ниже, чтобы заполнить форму отписки отсутствия.\n\n" +
+            "**Правила:**\n" +
+            "• Отписки принимаются при отсутствии более 10 дней\n" +
+            "• Исключение: отсутствие на собрании полка\n" +
+            "• Причина обязательна при отсутствии от 30 дней\n" +
+            "• Сообщения не по форме будут удаляться"
+          )
+          .addFields(
+            {
+              name: "📋 Форма для длительного отсутствия",
+              value: "```\n-\nОтсутствую с 00.00.2024 по 00.00.2024\nПричина: (Обязательна при отсутствии от 30 дней и больше)\n-```",
+              inline: false
+            },
+            {
+              name: "📋 Форма для отсутствия на собрании",
+              value: "```\n-\nБуду отсутствовать на собрании: 00.00.2024\n(Дата собрания будет указана в разделе 📻-новости📻)\n-```",
+              inline: false
+            }
+          )
+          .setFooter({ text: "⚠️ Отписки сделанные не по форме образца будут удаляться" })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId("absence_form_button")
+              .setLabel("📝 Заполнить форму отсутствия")
+              .setStyle(ButtonStyle.Primary)
+          );
+
+        await member.send({ 
+          embeds: [embed], 
+          components: [row]
+        });
+        
+        logVoiceState(`Отправлена форма отсутствия пользователю ${member.user.tag} при входе в канал`);
+      }
+    } catch (err: any) {
+      error("Ошибка при отправке формы отсутствия", err);
+    }
+  }
+>>>>>>> feature/absence-thread-integration
   // Работаем только с очередным каналом
   if (oldChannelId === QUEUE_CHANNEL_ID || newChannelId === QUEUE_CHANNEL_ID) {
     // Получаем актуальных участников канала
@@ -415,7 +486,11 @@ async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserDa
 }
 
 // Функция для полной синхронизации клана
+<<<<<<< HEAD
 async function performFullClanSync(client: Client) {
+=======
+async function performFullClanSync(client: Client): Promise<{ nick: string; points: number }[]> {
+>>>>>>> feature/absence-thread-integration
   logSyncclan("Начало полной синхронизации клана ALLIANCE");
   
   try {
@@ -520,9 +595,18 @@ async function performFullClanSync(client: Client) {
     // 4. Сохранить новые данные в основной файл
     saveCurrentMembers(members);
     logSyncclan("Данные сохранены в основной файл участников");
+<<<<<<< HEAD
 
   } catch (error: any) {
     logSyncclan(`Ошибка при полной синхронизации клана: ${error.message}`);
+=======
+    
+    return members;
+
+  } catch (error: any) {
+    logSyncclan(`Ошибка при полной синхронизации клана: ${error.message}`);
+    return [];
+>>>>>>> feature/absence-thread-integration
   }
 }
 
@@ -550,7 +634,11 @@ async function statsScheduler(client: Client) {
       try {
         const members = await fetchClanPoints("ALLIANCE");
         
+<<<<<<< HEAD
         // Получаем предыдущие данные из основного файла
+=======
+        // Получаем предыдущие данные из members_current.json
+>>>>>>> feature/absence-thread-integration
         const prev = loadCurrentMembers();
         
         // Получаем текущую информацию о лидерборде
@@ -618,9 +706,15 @@ async function statsScheduler(client: Client) {
           logStats("Статистика отправлена в канал (пропущенный сбор)");
         }
         
+<<<<<<< HEAD
         // Сохраняем новые данные в основной файл
         saveCurrentMembers(members);
         logStats("Обновлен основной файл участников новыми данными (пропущенный сбор)");
+=======
+        // Обновляем members_current.json новыми данными
+        saveCurrentMembers(members);
+        logStats("Обновлен members_current.json новыми данными (пропущенный сбор)");
+>>>>>>> feature/absence-thread-integration
         
         // Проверка конца сезона: все points = 0
         logStats(`Проверка конца сезона (пропущенный сбор): получено ${members.length} участников`);
@@ -662,7 +756,11 @@ async function statsScheduler(client: Client) {
     logStats("Полная синхронизация клана и сбор статистики (16:50)");
     
     // Выполняем полную синхронизацию клана
+<<<<<<< HEAD
     await performFullClanSync(client);
+=======
+    const members = await performFullClanSync(client);
+>>>>>>> feature/absence-thread-integration
     
     // Получаем информацию о месте полка в лидерборде
     logStats("Получение информации о месте полка в лидерборде...");
@@ -680,7 +778,10 @@ async function statsScheduler(client: Client) {
     }
     
     // Обновляем достижения
+<<<<<<< HEAD
     const members = loadCurrentMembers();
+=======
+>>>>>>> feature/absence-thread-integration
     const users = loadJson<Record<string, UserData>>(usersPath);
     await updateAchievers(client, users, members);
     
@@ -693,7 +794,11 @@ async function statsScheduler(client: Client) {
     try {
       const members = await fetchClanPoints("ALLIANCE");
       
+<<<<<<< HEAD
       // Получаем предыдущие данные из основного файла
+=======
+      // Получаем предыдущие данные из members_current.json
+>>>>>>> feature/absence-thread-integration
       const prev = loadCurrentMembers();
       
       // Получаем текущую информацию о лидерборде
@@ -763,9 +868,15 @@ async function statsScheduler(client: Client) {
         logStats("Статистика отправлена в канал");
       }
       
+<<<<<<< HEAD
       // Сохраняем новые данные в основной файл
       saveCurrentMembers(members);
       logStats("Обновлен основной файл участников новыми данными");
+=======
+      // Обновляем members_current.json новыми данными
+      saveCurrentMembers(members);
+      logStats("Обновлен members_current.json новыми данными");
+>>>>>>> feature/absence-thread-integration
       
       // Проверка конца сезона: все points = 0
       logStats(`Проверка конца сезона: получено ${members.length} участников`);
@@ -910,6 +1021,17 @@ client.once("ready", async () => {
   autoPbAnnounceScheduler(client);
   statsScheduler(client);
   syncclanScheduler(client);
+<<<<<<< HEAD
+=======
+  
+  // Запускаем сервис автоматического тестирования
+  try {
+    await autoTestService.start();
+    info("✅ Сервис автоматического тестирования запущен");
+  } catch (error) {
+    warn(`⚠️ Не удалось запустить сервис автоматического тестирования: ${error}`);
+  }
+>>>>>>> feature/absence-thread-integration
 });
 
 client.on("guildMemberAdd", (member: GuildMember) => {
@@ -935,4 +1057,20 @@ process.on("uncaughtException", (err) => {
   error("Необработанное исключение", err);
 });
 
+<<<<<<< HEAD
+=======
+// Graceful shutdown
+process.on("SIGINT", () => {
+  info("🛑 Получен сигнал SIGINT, завершение работы...");
+  autoTestService.stop();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  info("🛑 Получен сигнал SIGTERM, завершение работы...");
+  autoTestService.stop();
+  process.exit(0);
+});
+
+>>>>>>> feature/absence-thread-integration
 export { client, voiceCounts };

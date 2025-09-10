@@ -14,8 +14,30 @@ import { checktrackedCommand } from "./checktracked";
 import { simpleTestCommand } from "./simple-test";
 import { lichstatCommand } from "./lichstat";
 import { runtestsCommand } from "./runtests";
+<<<<<<< HEAD
 import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal, handleAircraftSelect as flightAcademyAircraftSelect } from "./flight-academy";
 import { aircraftListCommand, aircraftAddCommand, aircraftRemoveCommand, aircraftUpdateCommand, handleAircraftTypeSelect, handleAircraftListBack } from "./aircraft";
+=======
+import { autotestCommand } from "./autotest";
+import { teststatsfixCommand } from "./teststatsfix";
+import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal, handleAircraftSelect as flightAcademyAircraftSelect } from "./flight-academy";
+import { absenceformCommand, handleAbsenceFormButton, handleAbsenceFormModal, handleAbsenceTicketButton, absencelistCommand } from "./absenceform";
+import { 
+  aircraftListCommand, 
+  aircraftAddCommand, 
+  aircraftRemoveCommand, 
+  aircraftUpdateCommand, 
+  handleAircraftTypeSelect, 
+  handleAircraftListBack,
+  handleAircraftAddTypeSelect,
+  handleAircraftAddModal,
+  handleAircraftRemoveTypeSelect,
+  handleAircraftRemoveAircraftSelect,
+  handleAircraftUpdateTypeSelect,
+  handleAircraftUpdateAircraftSelect,
+  handleAircraftUpdateModal
+} from "./aircraft";
+>>>>>>> feature/absence-thread-integration
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error, info } from "../utils/logger";
 import { checkPermission } from "../utils/permissions";
@@ -35,6 +57,12 @@ export {
   checktrackedCommand,
   lichstatCommand,
   runtestsCommand,
+<<<<<<< HEAD
+=======
+  teststatsfixCommand,
+  absenceformCommand,
+  absencelistCommand,
+>>>>>>> feature/absence-thread-integration
 };
 
 export function setupCommands(client: Client) {
@@ -46,7 +74,12 @@ export function setupCommands(client: Client) {
         if (interaction.customId.startsWith("type_") || 
             interaction.customId.startsWith("license_") || 
             interaction.customId.startsWith("training_") || 
+<<<<<<< HEAD
             interaction.customId.startsWith("close_ticket_")) {
+=======
+            interaction.customId.startsWith("close_ticket_") ||
+            interaction.customId === "close_training_ticket") {
+>>>>>>> feature/absence-thread-integration
           await flightAcademyButton(interaction);
           return;
         }
@@ -56,6 +89,23 @@ export function setupCommands(client: Client) {
           await handleAircraftListBack(interaction);
           return;
         }
+<<<<<<< HEAD
+=======
+
+        // Обработка кнопки формы отсутствия
+        if (interaction.customId === "absence_form_button") {
+          await handleAbsenceFormButton(interaction);
+          return;
+        }
+
+        // Обработка кнопок заявок отсутствия
+        if (interaction.customId.startsWith("approve_absence_") || 
+            interaction.customId.startsWith("reject_absence_") || 
+            interaction.customId.startsWith("view_details_")) {
+          await handleAbsenceTicketButton(interaction);
+          return;
+        }
+>>>>>>> feature/absence-thread-integration
         
         if (interaction.customId === "pb_yes") {
           logInteraction("Нажата кнопка 'Собираю' для ПБ", { userId: interaction.user.id, username: interaction.user.tag });
@@ -201,9 +251,27 @@ export function setupCommands(client: Client) {
           case "runtests":
             await runtestsCommand(interaction);
             break;
+<<<<<<< HEAD
           case "flight-academy":
             await flightAcademyCommand(interaction);
             break;
+=======
+          case "teststatsfix":
+            await teststatsfixCommand(interaction);
+            break;
+          case "autotest":
+            await autotestCommand(interaction);
+            break;
+          case "flight-academy":
+            await flightAcademyCommand(interaction);
+            break;
+          case "absenceform":
+            await absenceformCommand(interaction);
+            break;
+          case "absencelist":
+            await absencelistCommand(interaction);
+            break;
+>>>>>>> feature/absence-thread-integration
         case "aircraft-list":
           info(`[COMMAND] 🎯 ПОПАЛИ В CASE aircraft-list для пользователя ${interaction.user.tag}`);
           info(`[COMMAND] Выполняется команда aircraft-list для пользователя ${interaction.user.tag}`);
@@ -243,6 +311,26 @@ export function setupCommands(client: Client) {
           await flightAcademyModal(interaction);
           return;
         }
+<<<<<<< HEAD
+=======
+        
+        // Обработка модальных окон управления самолётами
+        if (interaction.customId.startsWith("aircraft_add_modal:")) {
+          await handleAircraftAddModal(interaction);
+          return;
+        }
+        
+        if (interaction.customId.startsWith("aircraft_update_modal:")) {
+          await handleAircraftUpdateModal(interaction);
+          return;
+        }
+
+        // Обработка модального окна формы отсутствия
+        if (interaction.customId === "absence_form_modal") {
+          await handleAbsenceFormModal(interaction);
+          return;
+        }
+>>>>>>> feature/absence-thread-integration
       }
 
       // --- обработка селекторов ---
@@ -255,6 +343,34 @@ export function setupCommands(client: Client) {
           await handleAircraftTypeSelect(interaction);
           return;
         }
+<<<<<<< HEAD
+=======
+        
+        // Обработка селекторов управления самолётами
+        if (interaction.customId === "aircraft_add_type_select") {
+          await handleAircraftAddTypeSelect(interaction);
+          return;
+        }
+        if (interaction.customId === "aircraft_remove_type_select") {
+          await handleAircraftRemoveTypeSelect(interaction);
+          return;
+        }
+        
+        if (interaction.customId === "aircraft_remove_aircraft_select") {
+          await handleAircraftRemoveAircraftSelect(interaction);
+          return;
+        }
+        
+        if (interaction.customId === "aircraft_update_type_select") {
+          await handleAircraftUpdateTypeSelect(interaction);
+          return;
+        }
+        
+        if (interaction.customId === "aircraft_update_aircraft_select") {
+          await handleAircraftUpdateAircraftSelect(interaction);
+          return;
+        }
+>>>>>>> feature/absence-thread-integration
       }
     } catch (err: any) {
       error("Ошибка при обработке взаимодействия", err);

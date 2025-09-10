@@ -1,5 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
+<<<<<<< HEAD
+=======
+import { getDataFilePath } from "./paths";
+>>>>>>> feature/absence-thread-integration
 
 interface StatsCollectionRecord {
   date: string; // YYYY-MM-DD
@@ -12,7 +16,11 @@ interface StatsTrackingData {
   collections: StatsCollectionRecord[];
 }
 
+<<<<<<< HEAD
 const statsTrackingPath = path.join(__dirname, "..", "data", "stats_tracking.json");
+=======
+const statsTrackingPath = getDataFilePath("stats_tracking.json");
+>>>>>>> feature/absence-thread-integration
 
 function loadStatsTracking(): StatsTrackingData {
   if (!fs.existsSync(statsTrackingPath)) {

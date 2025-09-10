@@ -17,6 +17,24 @@ export async function statsCommand(interaction: ChatInputCommandInteraction) {
   // Получаем свежие данные через API
   const curr = await fetchClanPoints("ALLIANCE");
 
+<<<<<<< HEAD
+=======
+  // Проверяем, есть ли данные для сравнения
+  if (prev.length === 0) {
+    await interaction.editReply(
+      "⚠️ Нет сохраненных данных для сравнения. Используйте команду `/syncclan ALLIANCE` для получения данных клана."
+    );
+    return;
+  }
+
+  if (curr.length === 0) {
+    await interaction.editReply(
+      "❌ Не удалось получить данные клана ALLIANCE. Попробуйте позже."
+    );
+    return;
+  }
+
+>>>>>>> feature/absence-thread-integration
   // Сопоставим по нормализованному нику
   const prevMap = new Map<string, { nick: string; points: number }>();
   for (const p of prev) prevMap.set(normalize(p.nick), p);

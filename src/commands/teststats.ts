@@ -43,6 +43,20 @@ export async function teststatsCommand(interaction: ChatInputCommandInteraction)
     await interaction.editReply("📊 Анализирую данные участников...");
     const prev = loadMembersAtTime("1650");
     const curr = loadMembersAtTime("0120");
+<<<<<<< HEAD
+=======
+    
+    // Проверяем, есть ли данные для сравнения
+    if (prev.length === 0) {
+      await interaction.editReply("❌ Нет данных на 16:50 для сравнения. Дождитесь следующего сбора статистики в 16:50.");
+      return;
+    }
+    
+    if (curr.length === 0) {
+      await interaction.editReply("❌ Нет данных на 01:20 для сравнения. Дождитесь следующего сбора статистики в 01:20.");
+      return;
+    }
+>>>>>>> feature/absence-thread-integration
 
     // Сопоставим по нормализованному нику
     const prevMap = new Map<string, { nick: string; points: number }>();

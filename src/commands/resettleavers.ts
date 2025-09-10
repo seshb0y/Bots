@@ -1,8 +1,14 @@
 import { ChatInputCommandInteraction } from "discord.js";
 import * as fs from "fs";
 import * as path from "path";
+<<<<<<< HEAD
 
 const leaversTrackingPath = path.join(__dirname, "..", "data", "leavers_tracking.json");
+=======
+import { getDataFilePath } from "../utils/paths";
+
+const leaversTrackingPath = getDataFilePath("leavers_tracking.json");
+>>>>>>> feature/absence-thread-integration
 
 export async function resettleaversCommand(
   interaction: ChatInputCommandInteraction

@@ -3,6 +3,10 @@ import { utilsTests } from './utilsTests';
 import { commandsTests } from './commandsTests';
 import { dataTests } from './dataTests';
 import { networkTests } from './networkTests';
+<<<<<<< HEAD
+=======
+import { statsTests } from './statsTests';
+>>>>>>> feature/absence-thread-integration
 import { info, error } from '../utils/logger';
 
 export interface TestResult {
@@ -37,7 +41,12 @@ export async function runAllTests(): Promise<TestSuiteResult> {
     { name: "Утилиты", tests: utilsTests },
     { name: "Команды", tests: commandsTests },
     { name: "Данные", tests: dataTests },
+<<<<<<< HEAD
     { name: "Сеть", tests: networkTests }
+=======
+    { name: "Сеть", tests: networkTests },
+    { name: "Статистика", tests: statsTests }
+>>>>>>> feature/absence-thread-integration
   ];
 
   const result: TestSuiteResult = {
