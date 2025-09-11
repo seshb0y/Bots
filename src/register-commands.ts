@@ -1,10 +1,5 @@
 import { REST, Routes, SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import "dotenv/config";
-<<<<<<< HEAD
-=======
-import { data as autotestData } from "./commands/autotest";
-import { data as teststatsfixData } from "./commands/teststatsfix";
->>>>>>> feature/absence-thread-integration
 
 const commands = [
   new SlashCommandBuilder()
@@ -118,7 +113,6 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName("aircraft-add")
-<<<<<<< HEAD
     .setDescription("Добавить самолёт в список")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption((option) =>
@@ -214,27 +208,6 @@ const commands = [
     .setName("flight-academy")
     .setDescription("Создать тикет для лётной академии War Thunder")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
-=======
-    .setDescription("Добавить самолёт в список"),
-  new SlashCommandBuilder()
-    .setName("aircraft-remove")
-    .setDescription("Удалить самолёт из списка"),
-  new SlashCommandBuilder()
-    .setName("aircraft-update")
-    .setDescription("Обновить информацию о самолёте"),
-  new SlashCommandBuilder()
-    .setName("flight-academy")
-    .setDescription("Создать тикет для лётной академии War Thunder"),
-  new SlashCommandBuilder()
-    .setName("absenceform")
-    .setDescription("Создать форму для отписки отсутствия"),
-  new SlashCommandBuilder()
-    .setName("absencelist")
-    .setDescription("Показать список одобренных заявок об отсутствии")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
-  autotestData,
-  teststatsfixData,
->>>>>>> feature/absence-thread-integration
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

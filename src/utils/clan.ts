@@ -2,20 +2,11 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import * as fs from "fs";
 import * as path from "path";
-<<<<<<< HEAD
 
 const membersAPath = path.join(__dirname, "..", "data", "members_a.json");
 const membersBPath = path.join(__dirname, "..", "data", "members_b.json");
 const statePath = path.join(__dirname, "..", "data", "members_state.json");
 const leaversTrackingPath = path.join(__dirname, "..", "data", "leavers_tracking.json");
-=======
-import { getDataFilePath } from "./paths";
-
-const membersAPath = getDataFilePath("members_a.json");
-const membersBPath = getDataFilePath("members_b.json");
-const statePath = getDataFilePath("members_state.json");
-const leaversTrackingPath = getDataFilePath("leavers_tracking.json");
->>>>>>> feature/absence-thread-integration
 
 export async function fetchClanPoints(
   clanTag: string,
@@ -206,16 +197,12 @@ export function saveMembersAtTime(
   members: { nick: string; points: number }[],
   timeLabel: string
 ) {
-<<<<<<< HEAD
   const filePath = path.join(
     __dirname,
     "..",
     "data",
     `members_${timeLabel}.json`
   );
-=======
-  const filePath = getDataFilePath(`members_${timeLabel}.json`);
->>>>>>> feature/absence-thread-integration
   fs.writeFileSync(filePath, JSON.stringify(members, null, 2));
 }
 
@@ -223,16 +210,12 @@ export function saveMembersAtTime(
 export function loadMembersAtTime(
   timeLabel: string
 ): { nick: string; points: number }[] {
-<<<<<<< HEAD
   const filePath = path.join(
     __dirname,
     "..",
     "data",
     `members_${timeLabel}.json`
   );
-=======
-  const filePath = getDataFilePath(`members_${timeLabel}.json`);
->>>>>>> feature/absence-thread-integration
   if (!fs.existsSync(filePath)) return [];
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }
@@ -272,11 +255,7 @@ export function findLeaversFromTracking(
 }
 
 // Новые функции для работы с одним файлом участников
-<<<<<<< HEAD
 const membersCurrentPath = path.join(__dirname, "..", "data", "members_current.json");
-=======
-const membersCurrentPath = getDataFilePath("members_current.json");
->>>>>>> feature/absence-thread-integration
 
 // Сохраняет текущих участников в основной файл
 export function saveCurrentMembers(

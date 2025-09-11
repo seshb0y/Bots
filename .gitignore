@@ -70,3 +70,4 @@ Thumbs.db
 discord-bot-deploy.zip
 *.zip
 dist/
+data/
