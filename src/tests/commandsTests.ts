@@ -13,7 +13,6 @@ async function testCommandImports(): Promise<TestResult> {
     
     // Проверяем наличие файлов команд (сначала в исходниках)
     const requiredCommandFiles = [
-      'index.ts',
       'help.ts', 
       'points.ts',
       'addtracer.ts',

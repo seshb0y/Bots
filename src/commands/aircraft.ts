@@ -6,7 +6,11 @@ import {
   StringSelectMenuBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ModalSubmitInteraction
 } from "discord.js";
 import { info, error } from "../utils/logger.js";
 import { 
@@ -18,14 +22,15 @@ import {
   getAircraftTypeName,
   getAircraftTypeShort,
   AircraftType,
-  Aircraft
+  Aircraft,
+  createAircraftOptions
 } from "../utils/aircraft.js";
 
 // ID роли администратора самолётов
 const AIRCRAFT_ADMIN_ROLE_ID = "832294803706085396";
 
 // Проверка прав администратора самолётов
-function hasAircraftAdminRole(interaction: ChatInputCommandInteraction): boolean {
+function hasAircraftAdminRole(interaction: ChatInputCommandInteraction | ModalSubmitInteraction): boolean {
   if (!interaction.member || !interaction.guild) return false;
   
   const member = interaction.member;
@@ -58,77 +63,35 @@ export async function aircraftListCommand(interaction: ChatInputCommandInteracti
   try {
     info(`[AIRCRAFT] Пользователь ${interaction.user.tag} (${interaction.user.id}) запрашивает список самолётов`);
     
-    const type = interaction.options.getString("тип") as AircraftType | null;
     const data = loadAircraftData();
     
-    if (type) {
-      // Показываем самолёты конкретного типа
-      const aircraft = data[type] || [];
-      const typeName = getAircraftTypeName(type);
-      
-      if (aircraft.length === 0) {
-        await interaction.reply({
-          content: `❌ В категории **${typeName}** пока нет самолётов`,
-          ephemeral: true
-        });
-        return;
-      }
-      
-      const embed = new EmbedBuilder()
-        .setTitle(`✈️ Самолёты: ${typeName}`)
-        .setDescription(`Всего самолётов: **${aircraft.length}**`)
-        .setColor(0x00ff00)
-        .setTimestamp();
-      
-      aircraft.forEach((plane, index) => {
-        embed.addFields({
-          name: `${index + 1}. ${plane.name}`,
-          value: `**Нация:** ${plane.nation}\n**БР:** ${plane.br}`,
-          inline: true
-        });
-      });
-      
-      await interaction.reply({ embeds: [embed], ephemeral: true });
-      
-    } else {
-      // Показываем общую статистику
-      const embed = new EmbedBuilder()
-        .setTitle("✈️ Список самолётов")
-        .setDescription("Выберите тип самолётов для просмотра:")
-        .setColor(0x00ff00)
-        .setTimestamp();
-      
-      Object.entries(data).forEach(([type, aircraft]) => {
-        const typeName = getAircraftTypeName(type as AircraftType);
-        embed.addFields({
-          name: typeName,
-          value: `**Количество:** ${aircraft.length} самолётов`,
-          inline: true
-        });
-      });
-      
-      // Создаём селектор для выбора типа
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId("aircraft_type_select")
-        .setPlaceholder("Выберите тип самолётов")
-        .addOptions([
-          { label: "Поршневая авиация", value: "piston", description: `Показать ${data.piston.length} самолётов` },
-          { label: "Ранние реактивы", value: "early_jet", description: `Показать ${data.early_jet.length} самолётов` },
-          { label: "Современные реактивы", value: "modern_jet", description: `Показать ${data.modern_jet.length} самолётов` }
-        ]);
-      
-      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-      
-      await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
-    }
+    const embed = new EmbedBuilder()
+      .setTitle("✈️ Список самолётов")
+      .setDescription("Все самолёты по категориям:")
+      .setColor(0x00ff00)
+      .setTimestamp();
     
+    // Добавляем информацию по каждой категории
+    Object.entries(data).forEach(([type, aircraft]) => {
+      const typeName = getAircraftTypeName(type as AircraftType);
+      const aircraftList = aircraft.length > 0 
+        ? aircraft.map((a: Aircraft) => `• ${a.name}`).join('\n')
+        : 'Нет самолётов';
+      
+      embed.addFields({
+        name: `${typeName} (${aircraft.length})`,
+        value: aircraftList,
+        inline: false
+      });
+    });
+    
+    await interaction.reply({ embeds: [embed] });
     info(`[AIRCRAFT] Список самолётов показан для ${interaction.user.tag}`);
     
   } catch (err) {
     error(`[AIRCRAFT] Ошибка при показе списка самолётов для ${interaction.user.tag}:`, err);
     await interaction.reply({
-      content: "❌ Произошла ошибка при загрузке списка самолётов",
-      ephemeral: true
+      content: "❌ Произошла ошибка при загрузке списка самолётов"
     });
   }
 }
@@ -146,39 +109,50 @@ export async function aircraftAddCommand(interaction: ChatInputCommandInteractio
       return;
     }
     
-    const type = interaction.options.getString("тип", true) as AircraftType;
-    const name = interaction.options.getString("название", true);
-    const br = interaction.options.getString("бр", true);
-    const nation = interaction.options.getString("нация", true);
+    // Создаём модальное окно для добавления самолёта
+    const modal = new ModalBuilder()
+      .setCustomId('aircraft_add_modal')
+      .setTitle('Добавить самолёт');
     
-    const aircraft: Aircraft = {
-      name,
-      type,
-      br,
-      nation
-    };
+    // Селектор типа самолёта
+    const typeSelect = new StringSelectMenuBuilder()
+      .setCustomId('aircraft_type_select')
+      .setPlaceholder('Выберите тип самолёта')
+      .addOptions([
+        { label: 'Поршневая авиация', value: 'piston', description: 'Поршневые самолёты' },
+        { label: 'Ранние реактивы', value: 'early_jet', description: 'Ранние реактивные самолёты' },
+        { label: 'Современные реактивы', value: 'modern_jet', description: 'Современные реактивные самолёты' }
+      ]);
     
-    addAircraft(aircraft);
+    const typeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(typeSelect);
     
+    // Поле для названия самолёта
+    const nameInput = new TextInputBuilder()
+      .setCustomId('aircraft_name')
+      .setLabel('Название самолёта')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Например: F-16C Fighting Falcon')
+      .setRequired(true)
+      .setMaxLength(100);
+    
+    const nameRow = new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput);
+    
+    // Создаём embed с инструкциями
     const embed = new EmbedBuilder()
-      .setTitle("✅ Самолёт добавлен")
-      .setDescription(`Самолёт **${name}** успешно добавлен в категорию **${getAircraftTypeName(type)}**`)
-      .setColor(0x00ff00)
-      .addFields(
-        { name: "Название", value: name, inline: true },
-        { name: "Тип", value: getAircraftTypeName(type), inline: true },
-        { name: "БР", value: br, inline: true },
-        { name: "Нация", value: nation, inline: true }
-      )
-      .setTimestamp();
+      .setTitle('✈️ Добавление самолёта')
+      .setDescription('Выберите тип самолёта и введите его название:')
+      .setColor(0x00ff00);
     
-    await interaction.reply({ embeds: [embed], ephemeral: true });
-    info(`[AIRCRAFT] Самолёт "${name}" добавлен пользователем ${interaction.user.tag}`);
+    await interaction.reply({ 
+      embeds: [embed], 
+      components: [typeRow],
+      ephemeral: true 
+    });
     
   } catch (err) {
-    error(`[AIRCRAFT] Ошибка при добавлении самолёта пользователем ${interaction.user.tag}:`, err);
+    error(`[AIRCRAFT] Ошибка при создании модального окна добавления самолёта:`, err);
     await interaction.reply({
-      content: `❌ Ошибка при добавлении самолёта: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
+      content: `❌ Ошибка при создании формы: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
       ephemeral: true
     });
   }
@@ -197,42 +171,33 @@ export async function aircraftRemoveCommand(interaction: ChatInputCommandInterac
       return;
     }
     
-    const type = interaction.options.getString("тип", true) as AircraftType;
-    const aircraftName = interaction.options.getString("название", true);
+    // Создаём селектор типа самолёта
+    const typeSelect = new StringSelectMenuBuilder()
+      .setCustomId('aircraft_remove_type_select')
+      .setPlaceholder('Выберите тип самолёта')
+      .addOptions([
+        { label: 'Поршневая авиация', value: 'piston', description: 'Поршневые самолёты' },
+        { label: 'Ранние реактивы', value: 'early_jet', description: 'Ранние реактивные самолёты' },
+        { label: 'Современные реактивы', value: 'modern_jet', description: 'Современные реактивные самолёты' }
+      ]);
     
-    // Получаем информацию о самолёте перед удалением
-    const data = loadAircraftData();
-    const aircraft = data[type].find(a => a.name === aircraftName);
-    
-    if (!aircraft) {
-      await interaction.reply({
-        content: `❌ Самолёт "${aircraftName}" не найден в категории ${getAircraftTypeName(type)}`,
-        ephemeral: true
-      });
-      return;
-    }
-    
-    removeAircraft(type, aircraftName);
+    const typeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(typeSelect);
     
     const embed = new EmbedBuilder()
-      .setTitle("🗑️ Самолёт удалён")
-      .setDescription(`Самолёт **${aircraft.name}** успешно удалён из категории **${getAircraftTypeName(type)}**`)
-      .setColor(0xff0000)
-      .addFields(
-        { name: "Название", value: aircraft.name, inline: true },
-        { name: "Тип", value: getAircraftTypeName(type), inline: true },
-        { name: "БР", value: aircraft.br, inline: true },
-        { name: "Нация", value: aircraft.nation, inline: true }
-      )
-      .setTimestamp();
+      .setTitle('🗑️ Удаление самолёта')
+      .setDescription('Выберите тип самолёта для удаления:')
+      .setColor(0xff0000);
     
-    await interaction.reply({ embeds: [embed], ephemeral: true });
-    info(`[AIRCRAFT] Самолёт "${aircraft.name}" удалён пользователем ${interaction.user.tag}`);
+    await interaction.reply({ 
+      embeds: [embed], 
+      components: [typeRow],
+      ephemeral: true 
+    });
     
   } catch (err) {
-    error(`[AIRCRAFT] Ошибка при удалении самолёта пользователем ${interaction.user.tag}:`, err);
+    error(`[AIRCRAFT] Ошибка при создании формы удаления самолёта:`, err);
     await interaction.reply({
-      content: `❌ Ошибка при удалении самолёта: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
+      content: `❌ Ошибка при создании формы: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
       ephemeral: true
     });
   }
@@ -251,158 +216,429 @@ export async function aircraftUpdateCommand(interaction: ChatInputCommandInterac
       return;
     }
     
-    const type = interaction.options.getString("тип", true) as AircraftType;
-    const aircraftName = interaction.options.getString("название", true);
-    const newName = interaction.options.getString("новое_название");
-    const br = interaction.options.getString("бр");
-    const nation = interaction.options.getString("нация");
+    // Создаём селектор типа самолёта
+    const typeSelect = new StringSelectMenuBuilder()
+      .setCustomId('aircraft_update_type_select')
+      .setPlaceholder('Выберите тип самолёта')
+      .addOptions([
+        { label: 'Поршневая авиация', value: 'piston', description: 'Поршневые самолёты' },
+        { label: 'Ранние реактивы', value: 'early_jet', description: 'Ранние реактивные самолёты' },
+        { label: 'Современные реактивы', value: 'modern_jet', description: 'Современные реактивные самолёты' }
+      ]);
     
-    // Получаем текущие данные самолёта
-    const data = loadAircraftData();
-    const currentAircraft = data[type].find(a => a.name === aircraftName);
-    
-    if (!currentAircraft) {
-      await interaction.reply({
-        content: `❌ Самолёт "${aircraftName}" не найден в категории ${getAircraftTypeName(type)}`,
-        ephemeral: true
-      });
-      return;
-    }
-    
-    // Обновляем только указанные поля
-    const updatedAircraft: Aircraft = {
-      name: newName || currentAircraft.name,
-      type: currentAircraft.type,
-      br: br || currentAircraft.br,
-      nation: nation || currentAircraft.nation
-    };
-    
-    updateAircraft(updatedAircraft);
+    const typeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(typeSelect);
     
     const embed = new EmbedBuilder()
-      .setTitle("✏️ Самолёт обновлён")
-      .setDescription(`Самолёт **${updatedAircraft.name}** успешно обновлён`)
-      .setColor(0x00ff00)
-      .addFields(
-        { name: "Название", value: updatedAircraft.name, inline: true },
-        { name: "Тип", value: getAircraftTypeName(type), inline: true },
-        { name: "БР", value: updatedAircraft.br, inline: true },
-        { name: "Нация", value: updatedAircraft.nation, inline: true }
-      )
-      .setTimestamp();
+      .setTitle('✏️ Изменение самолёта')
+      .setDescription('Выберите тип самолёта для изменения:')
+      .setColor(0xffff00);
     
-    await interaction.reply({ embeds: [embed], ephemeral: true });
-    info(`[AIRCRAFT] Самолёт "${updatedAircraft.name}" обновлён пользователем ${interaction.user.tag}`);
+    await interaction.reply({ 
+      embeds: [embed], 
+      components: [typeRow],
+      ephemeral: true 
+    });
     
   } catch (err) {
-    error(`[AIRCRAFT] Ошибка при обновлении самолёта пользователем ${interaction.user.tag}:`, err);
+    error(`[AIRCRAFT] Ошибка при создании формы изменения самолёта:`, err);
     await interaction.reply({
-      content: `❌ Ошибка при обновлении самолёта: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
+      content: `❌ Ошибка при создании формы: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
       ephemeral: true
     });
   }
 }
 
-// Обработчик селектора типа самолётов
+// Обработчик селектора типа для добавления самолёта
 export async function handleAircraftTypeSelect(interaction: any) {
   try {
     if (!interaction.isStringSelectMenu()) return;
     
     if (interaction.customId === "aircraft_type_select") {
       const type = interaction.values[0] as AircraftType;
+      
+      // Создаём модальное окно с полем для названия
+      const modal = new ModalBuilder()
+        .setCustomId(`aircraft_add_modal_${type}`)
+        .setTitle(`Добавить ${getAircraftTypeName(type)}`);
+      
+      const nameInput = new TextInputBuilder()
+        .setCustomId('aircraft_name')
+        .setLabel('Название самолёта')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Например: F-16C Fighting Falcon')
+        .setRequired(true)
+        .setMaxLength(100);
+      
+      const nameRow = new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput);
+      modal.addComponents(nameRow);
+      
+      await interaction.showModal(modal);
+    }
+    
+  } catch (err) {
+    error(`[AIRCRAFT] Ошибка при обработке селектора типа самолётов:`, err);
+    await interaction.reply({
+      content: "❌ Произошла ошибка при обработке выбора",
+      ephemeral: true
+    });
+  }
+}
+
+// Обработчик модального окна добавления самолёта
+export async function handleAircraftAddModal(interaction: ModalSubmitInteraction) {
+  try {
+    if (!interaction.isModalSubmit()) return;
+    
+    if (!interaction.customId.startsWith('aircraft_add_modal_')) return;
+    
+    if (!hasAircraftAdminRole(interaction)) {
+      await interaction.reply({
+        content: "❌ У вас нет прав для управления списком самолётов",
+        ephemeral: true
+      });
+      return;
+    }
+    
+    const type = interaction.customId.replace('aircraft_add_modal_', '') as AircraftType;
+    const name = interaction.fields.getTextInputValue('aircraft_name');
+    
+    const aircraft: Aircraft = {
+      name: name.trim(),
+      type
+    };
+    
+    addAircraft(aircraft);
+    
+    const embed = new EmbedBuilder()
+      .setTitle("✅ Самолёт добавлен")
+      .setDescription(`Самолёт **${name}** успешно добавлен в категорию **${getAircraftTypeName(type)}**`)
+      .setColor(0x00ff00)
+      .addFields(
+        { name: "Название", value: name, inline: true },
+        { name: "Тип", value: getAircraftTypeName(type), inline: true }
+      )
+      .setTimestamp();
+    
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+    info(`[AIRCRAFT] Самолёт "${name}" добавлен пользователем ${interaction.user.tag}`);
+    
+  } catch (err) {
+    error(`[AIRCRAFT] Ошибка при добавлении самолёта:`, err);
+    await interaction.reply({
+      content: `❌ Ошибка при добавлении самолёта: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
+      ephemeral: true
+    });
+  }
+}
+
+// Обработчик селектора типа для удаления самолёта
+export async function handleAircraftRemoveTypeSelect(interaction: any) {
+  try {
+    if (!interaction.isStringSelectMenu()) return;
+    
+    if (interaction.customId === "aircraft_remove_type_select") {
+      const type = interaction.values[0] as AircraftType;
       const data = loadAircraftData();
       const aircraft = data[type] || [];
-      const typeName = getAircraftTypeName(type);
       
       if (aircraft.length === 0) {
         await interaction.update({
-          content: `❌ В категории **${typeName}** пока нет самолётов`,
+          content: `❌ В категории **${getAircraftTypeName(type)}** нет самолётов для удаления`,
           embeds: [],
           components: []
         });
         return;
       }
       
+      // Создаём селектор самолётов
+      const aircraftSelect = new StringSelectMenuBuilder()
+        .setCustomId('aircraft_remove_select')
+        .setPlaceholder('Выберите самолёт для удаления')
+        .addOptions(createAircraftOptions(aircraft));
+      
+      const aircraftRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(aircraftSelect);
+      
       const embed = new EmbedBuilder()
-        .setTitle(`✈️ Самолёты: ${typeName}`)
-        .setDescription(`Всего самолётов: **${aircraft.length}**`)
-        .setColor(0x00ff00)
-        .setTimestamp();
+        .setTitle(`🗑️ Удаление самолёта - ${getAircraftTypeName(type)}`)
+        .setDescription('Выберите самолёт для удаления:')
+        .setColor(0xff0000);
       
-      aircraft.forEach((plane, index) => {
-        embed.addFields({
-          name: `${index + 1}. ${plane.name}`,
-          value: `**Нация:** ${plane.nation}\n**БР:** ${plane.br}`,
-          inline: true
-        });
+      await interaction.update({ 
+        embeds: [embed], 
+        components: [aircraftRow]
       });
-      
-      // Кнопка "Назад"
-      const backButton = new ButtonBuilder()
-        .setCustomId("aircraft_list_back")
-        .setLabel("← Назад к списку")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("⬅️");
-      
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(backButton);
-      
-      await interaction.update({ embeds: [embed], components: [row] });
     }
     
   } catch (err) {
-    error(`[AIRCRAFT] Ошибка при обработке селектора типа самолётов:`, err);
+    error(`[AIRCRAFT] Ошибка при обработке селектора типа для удаления:`, err);
+    await interaction.reply({
+      content: "❌ Произошла ошибка при обработке выбора",
+      ephemeral: true
+    });
+  }
+}
+
+// Обработчик селектора самолёта для удаления
+export async function handleAircraftRemoveSelect(interaction: any) {
+  try {
+    if (!interaction.isStringSelectMenu()) return;
+    
+    if (interaction.customId === "aircraft_remove_select") {
+      const aircraftName = interaction.values[0];
+      
+      // Находим самолёт по названию
+      const data = loadAircraftData();
+      let aircraftToRemove: Aircraft | null = null;
+      let aircraftType: AircraftType | null = null;
+      
+      for (const [type, aircraft] of Object.entries(data)) {
+        const found = aircraft.find((a: Aircraft) => a.name === aircraftName);
+        if (found) {
+          aircraftToRemove = found;
+          aircraftType = type as AircraftType;
+          break;
+        }
+      }
+      
+      if (!aircraftToRemove || !aircraftType) {
+        await interaction.update({
+          content: `❌ Самолёт "${aircraftName}" не найден`,
+          embeds: [],
+          components: []
+        });
+        return;
+      }
+      
+      removeAircraft(aircraftType, aircraftName);
+      
+      const embed = new EmbedBuilder()
+        .setTitle("🗑️ Самолёт удалён")
+        .setDescription(`Самолёт **${aircraftToRemove.name}** успешно удалён из категории **${getAircraftTypeName(aircraftType)}**`)
+        .setColor(0xff0000)
+        .addFields(
+          { name: "Название", value: aircraftToRemove.name, inline: true },
+          { name: "Тип", value: getAircraftTypeName(aircraftType), inline: true }
+        )
+        .setTimestamp();
+      
+      await interaction.update({ 
+        embeds: [embed], 
+        components: []
+      });
+      
+      info(`[AIRCRAFT] Самолёт "${aircraftToRemove.name}" удалён пользователем ${interaction.user.tag}`);
+    }
+    
+  } catch (err) {
+    error(`[AIRCRAFT] Ошибка при удалении самолёта:`, err);
     await interaction.update({
-      content: "❌ Произошла ошибка при загрузке списка самолётов",
+      content: `❌ Ошибка при удалении самолёта: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
       embeds: [],
       components: []
     });
   }
 }
 
-// Обработчик кнопки "Назад" для списка самолётов
-export async function handleAircraftListBack(interaction: any) {
+// Обработчик селектора типа для изменения самолёта
+export async function handleAircraftUpdateTypeSelect(interaction: any) {
   try {
-    if (!interaction.isButton()) return;
+    if (!interaction.isStringSelectMenu()) return;
     
-    if (interaction.customId === "aircraft_list_back") {
+    if (interaction.customId === "aircraft_update_type_select") {
+      const type = interaction.values[0] as AircraftType;
       const data = loadAircraftData();
+      const aircraft = data[type] || [];
+      
+      info(`[AIRCRAFT] Обработка селектора типа для изменения: ${type}, найдено самолётов: ${aircraft.length}`);
+      
+      if (aircraft.length === 0) {
+        await interaction.update({
+          content: `❌ В категории **${getAircraftTypeName(type)}** нет самолётов для изменения`,
+          embeds: [],
+          components: []
+        });
+        return;
+      }
+      
+      // Создаём селектор самолётов
+      const aircraftSelect = new StringSelectMenuBuilder()
+        .setCustomId('aircraft_update_select')
+        .setPlaceholder('Выберите самолёт для изменения')
+        .addOptions(createAircraftOptions(aircraft));
+      
+      const aircraftRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(aircraftSelect);
       
       const embed = new EmbedBuilder()
-        .setTitle("✈️ Список самолётов")
-        .setDescription("Выберите тип самолётов для просмотра:")
-        .setColor(0x00ff00)
-        .setTimestamp();
+        .setTitle(`✏️ Изменение самолёта - ${getAircraftTypeName(type)}`)
+        .setDescription('Выберите самолёт для изменения:')
+        .setColor(0xffff00);
       
-      Object.entries(data).forEach(([type, aircraft]) => {
-        const typeName = getAircraftTypeName(type as AircraftType);
-        embed.addFields({
-          name: typeName,
-          value: `**Количество:** ${aircraft.length} самолётов`,
-          inline: true
-        });
+      await interaction.update({ 
+        embeds: [embed], 
+        components: [aircraftRow]
       });
-      
-      // Создаём селектор для выбора типа
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId("aircraft_type_select")
-        .setPlaceholder("Выберите тип самолётов")
-        .addOptions([
-          { label: "Поршневая авиация", value: "piston", description: `Показать ${data.piston.length} самолётов` },
-          { label: "Ранние реактивы", value: "early_jet", description: `Показать ${data.early_jet.length} самолётов` },
-          { label: "Современные реактивы", value: "modern_jet", description: `Показать ${data.modern_jet.length} самолётов` }
-        ]);
-      
-      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-      
-      await interaction.update({ embeds: [embed], components: [row] });
     }
     
   } catch (err) {
-    error(`[AIRCRAFT] Ошибка при обработке кнопки "Назад":`, err);
-    await interaction.update({
-      content: "❌ Произошла ошибка при возврате к списку",
-      embeds: [],
-      components: []
+    error(`[AIRCRAFT] Ошибка при обработке селектора типа для изменения:`, err);
+    await interaction.reply({
+      content: "❌ Произошла ошибка при обработке выбора",
+      ephemeral: true
+    });
+  }
+}
+
+// Обработчик селектора самолёта для изменения
+export async function handleAircraftUpdateSelect(interaction: any) {
+  try {
+    if (!interaction.isStringSelectMenu()) return;
+    
+    if (interaction.customId === "aircraft_update_select") {
+      const aircraftName = interaction.values[0];
+      
+      // Находим самолёт по названию
+      const data = loadAircraftData();
+      let aircraftToUpdate: Aircraft | null = null;
+      let aircraftType: AircraftType | null = null;
+      
+      for (const [type, aircraft] of Object.entries(data)) {
+        const found = aircraft.find((a: Aircraft) => a.name === aircraftName);
+        if (found) {
+          aircraftToUpdate = found;
+          aircraftType = type as AircraftType;
+          break;
+        }
+      }
+      
+      if (!aircraftToUpdate || !aircraftType) {
+        await interaction.update({
+          content: `❌ Самолёт "${aircraftName}" не найден`,
+          embeds: [],
+          components: []
+        });
+        return;
+      }
+      
+      // Создаём модальное окно с полем для нового названия
+      const modal = new ModalBuilder()
+        .setCustomId(`aircraft_update_modal_${aircraftType}_${aircraftName}`)
+        .setTitle(`Изменить самолёт: ${aircraftName}`);
+      
+      const nameInput = new TextInputBuilder()
+        .setCustomId('aircraft_new_name')
+        .setLabel('Новое название самолёта')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(aircraftName)
+        .setValue(aircraftName)
+        .setRequired(true)
+        .setMaxLength(100);
+      
+      const nameRow = new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput);
+      modal.addComponents(nameRow);
+      
+      await interaction.showModal(modal);
+    }
+    
+  } catch (err) {
+    error(`[AIRCRAFT] Ошибка при обработке селектора самолёта для изменения:`, err);
+    await interaction.reply({
+      content: "❌ Произошла ошибка при обработке выбора",
+      ephemeral: true
+    });
+  }
+}
+
+// Обработчик модального окна изменения самолёта
+export async function handleAircraftUpdateModal(interaction: ModalSubmitInteraction) {
+  try {
+    if (!interaction.isModalSubmit()) return;
+    
+    if (!interaction.customId.startsWith('aircraft_update_modal_')) return;
+    
+    if (!hasAircraftAdminRole(interaction)) {
+      await interaction.reply({
+        content: "❌ У вас нет прав для управления списком самолётов",
+        ephemeral: true
+      });
+      return;
+    }
+    
+    // Парсим customId: aircraft_update_modal_{type}_{oldName}
+    const customId = interaction.customId.replace('aircraft_update_modal_', '');
+    info(`[AIRCRAFT] Парсинг customId: ${interaction.customId} -> ${customId}`);
+    
+    // Находим первое подчеркивание после типа самолёта
+    let type: AircraftType;
+    let oldName: string;
+    
+    if (customId.startsWith('piston_')) {
+      type = 'piston';
+      oldName = customId.replace('piston_', '');
+    } else if (customId.startsWith('early_jet_')) {
+      type = 'early_jet';
+      oldName = customId.replace('early_jet_', '');
+    } else if (customId.startsWith('modern_jet_')) {
+      type = 'modern_jet';
+      oldName = customId.replace('modern_jet_', '');
+    } else {
+      await interaction.reply({
+        content: "❌ Ошибка при определении типа самолёта",
+        ephemeral: true
+      });
+      return;
+    }
+    const newName = interaction.fields.getTextInputValue('aircraft_new_name').trim();
+    
+    if (newName === oldName) {
+      await interaction.reply({
+        content: "❌ Новое название должно отличаться от текущего",
+        ephemeral: true
+      });
+      return;
+    }
+    
+    // Получаем текущий самолёт
+    const data = loadAircraftData();
+    const aircraftList = data[type] || [];
+    const currentAircraft = aircraftList.find(a => a.name === oldName);
+    
+    if (!currentAircraft) {
+      await interaction.reply({
+        content: `❌ Самолёт "${oldName}" не найден в категории ${getAircraftTypeName(type)}`,
+        ephemeral: true
+      });
+      return;
+    }
+    
+    // Создаём обновлённый самолёт
+    const updatedAircraft: Aircraft = {
+      name: newName,
+      type: currentAircraft.type
+    };
+    
+    // Удаляем старый и добавляем новый
+    removeAircraft(type, oldName);
+    addAircraft(updatedAircraft);
+    
+    const embed = new EmbedBuilder()
+      .setTitle("✏️ Самолёт обновлён")
+      .setDescription(`Самолёт **${oldName}** переименован в **${newName}**`)
+      .setColor(0x00ff00)
+      .addFields(
+        { name: "Старое название", value: oldName, inline: true },
+        { name: "Новое название", value: newName, inline: true },
+        { name: "Тип", value: getAircraftTypeName(type), inline: true }
+      )
+      .setTimestamp();
+    
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+    info(`[AIRCRAFT] Самолёт "${oldName}" переименован в "${newName}" пользователем ${interaction.user.tag}`);
+    
+  } catch (err) {
+    error(`[AIRCRAFT] Ошибка при обновлении самолёта:`, err);
+    await interaction.reply({
+      content: `❌ Ошибка при обновлении самолёта: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
+      ephemeral: true
     });
   }
 }

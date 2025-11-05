@@ -114,100 +114,162 @@ const commands = [
   new SlashCommandBuilder()
     .setName("aircraft-add")
     .setDescription("Добавить самолёт в список")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption((option) =>
-      option
-        .setName("тип")
-        .setDescription("Тип самолёта")
-        .setRequired(true)
-        .addChoices(
-          { name: "Поршневая авиация", value: "piston" },
-          { name: "Ранние реактивы", value: "early_jet" },
-          { name: "Современные реактивы", value: "modern_jet" }
-        )
-    )
-    .addStringOption((option) =>
-      option
-        .setName("название")
-        .setDescription("Название самолёта")
-        .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("бр")
-        .setDescription("Боевой рейтинг")
-        .setRequired(true)
-    )
-        .addStringOption((option) =>
-      option
-        .setName("нация")
-        .setDescription("Нация самолёта")
-        .setRequired(true)
-    ),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("aircraft-remove")
     .setDescription("Удалить самолёт из списка")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption((option) =>
-      option
-        .setName("тип")
-        .setDescription("Тип самолёта")
-        .setRequired(true)
-        .addChoices(
-          { name: "Поршневая авиация", value: "piston" },
-          { name: "Ранние реактивы", value: "early_jet" },
-          { name: "Современные реактивы", value: "modern_jet" }
-        )
-    )
-    .addStringOption((option) =>
-      option
-        .setName("название")
-        .setDescription("Название самолёта для удаления")
-        .setRequired(true)
-    ),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("aircraft-update")
     .setDescription("Обновить информацию о самолёте")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption((option) =>
-      option
-        .setName("тип")
-        .setDescription("Тип самолёта")
-        .setRequired(true)
-        .addChoices(
-          { name: "Поршневая авиация", value: "piston" },
-          { name: "Ранние реактивы", value: "early_jet" },
-          { name: "Современные реактивы", value: "modern_jet" }
-        )
-    )
-    .addStringOption((option) =>
-      option
-        .setName("название")
-        .setDescription("Название самолёта для обновления")
-        .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("новое_название")
-        .setDescription("Новое название самолёта")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("бр")
-        .setDescription("Новый боевой рейтинг")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("нация")
-        .setDescription("Новая нация самолёта")
-        .setRequired(false)
-    ),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("flight-academy")
     .setDescription("Создать тикет для лётной академии War Thunder")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder()
+    .setName("absenceform")
+    .setDescription("Создать форму отписки отсутствия"),
+  new SlashCommandBuilder()
+    .setName("absencelist")
+    .setDescription("Показать список заявок об отсутствии")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+  new SlashCommandBuilder()
+    .setName("ticket-history")
+    .setDescription("Просмотр истории тикетов лётной академии")
+    .setDefaultMemberPermissions(0) // Changed to 0 for custom role check
+    .addStringOption(option =>
+      option
+        .setName("тип")
+        .setDescription("Тип фильтрации тикетов")
+        .setRequired(false)
+        .addChoices(
+          { name: "Все тикеты", value: "all" },
+          { name: "Открытые", value: "open" },
+          { name: "Закрытые", value: "closed" },
+          { name: "Лицензии", value: "licenses" },
+          { name: "Обучение", value: "training" },
+          { name: "Мои тикеты", value: "my" },
+          { name: "Лицензии сданы", value: "completed" },
+          { name: "Лицензии не сданы", value: "failed" },
+          { name: "Отменённые", value: "cancelled" }
+        )
+    ),
+  new SlashCommandBuilder()
+    .setName("publish-tickets")
+    .setDescription("Публикация тикетов в канал истории лётной академии")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(option =>
+      option
+        .setName("тип")
+        .setDescription("Тип публикации")
+        .setRequired(true)
+        .addChoices(
+          { name: "Все неопубликованные", value: "unpublished" },
+          { name: "Только закрытые", value: "closed" },
+          { name: "Конкретный тикет", value: "specific" }
+        )
+    )
+    .addStringOption(option =>
+      option
+        .setName("тикет-id")
+        .setDescription("ID конкретного тикета (только для типа 'specific')")
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-help")
+    .setDescription("Показать справку по командам управления твинками"),
+  new SlashCommandBuilder()
+    .setName("twink-list")
+    .setDescription("Показать список всех твинков (полковых аккаунтов)"),
+  new SlashCommandBuilder()
+    .setName("twink-show")
+    .setDescription("Показать информацию о конкретном твинке")
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Имя пользователя твинка")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-create")
+    .setDescription("Создать новый твинк"),
+  new SlashCommandBuilder()
+    .setName("twink-update")
+    .setDescription("Обновить данные твинка")
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Имя пользователя твинка")
+        .setRequired(true)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("field")
+        .setDescription("Поле для обновления")
+        .setRequired(true)
+        .addChoices(
+          { name: "Никнейм", value: "username" },
+          { name: "Логин", value: "login" },
+          { name: "Пароль", value: "password" }
+        )
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-toggle-2fa")
+    .setDescription("Переключить статус 2FA для твинка")
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Имя пользователя твинка")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-delete")
+    .setDescription("Удалить твинк")
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Имя пользователя твинка")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-vehicle-add")
+    .setDescription("Добавить технику к твинку")
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Имя пользователя твинка")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-vehicle-remove")
+    .setDescription("Удалить технику из твинка")
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Имя пользователя твинка")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-vehicle-update")
+    .setDescription("Редактировать технику твинка")
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Имя пользователя твинка")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("twink-find")
+    .setDescription("Найти твинки с техникой под необходимый БР")
+    .addNumberOption((option) =>
+      option
+        .setName("br")
+        .setDescription("Целевой БР (например, 8.0 - найдет технику с БР 7.0-8.0)")
+        .setRequired(true)
+        .setMinValue(0)
+        .setMaxValue(15)
+    ),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);

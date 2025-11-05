@@ -3,20 +3,10 @@ import * as fs from "fs";
 
 /**
  * Определяет правильный путь к директории данных
- * В разработке: /opt/discord-bot/data/
- * В продакшене: /opt/discord-bot/dist/data/
+ * Всегда использует /opt/data/ независимо от окружения
  */
 export function getDataPath(): string {
-  // Проверяем, находимся ли мы в скомпилированной версии
-  const isCompiled = __dirname.includes('dist');
-  
-  if (isCompiled) {
-    // В скомпилированной версии: dist/utils -> dist/data
-    return path.join(__dirname, "..", "data");
-  } else {
-    // В исходной версии: src/utils -> data
-    return path.join(__dirname, "..", "..", "data");
-  }
+  return "/opt/data";
 }
 
 /**

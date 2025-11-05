@@ -7,13 +7,10 @@ import {
   User,
   TextChannel,
   Guild,
-<<<<<<< HEAD
-=======
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
->>>>>>> feature/absence-thread-integration
 } from "discord.js";
 import { config } from "dotenv";
 import {
@@ -26,13 +23,9 @@ import {
 } from "./constants";
 import { loadJson, saveJson } from "./utils/json";
 import { UserData, TrackedPlayer } from "./types";
+import { getDataFilePath } from "./utils/paths";
 import { pbNotifyScheduler, autoPbAnnounceScheduler } from "./utils/pbNotify";
 import {
-<<<<<<< HEAD
-  saveMembersAtTime,
-  loadMembersAtTime,
-=======
->>>>>>> feature/absence-thread-integration
   fetchClanPoints,
   saveMembersAlternating,
   saveCurrentMembers,
@@ -48,10 +41,7 @@ import {
 } from "./utils/leaderboard";
 import { normalize } from "./utils/normalize";
 import { trackFunctionPerformance } from "./commands/resources";
-<<<<<<< HEAD
-=======
 import { autoTestService } from "./tests/autoTestService";
->>>>>>> feature/absence-thread-integration
 import { 
   info, 
   warn, 
@@ -59,10 +49,11 @@ import {
   logVoiceState, 
   logStats, 
   logSyncclan, 
-  logQueue, 
-  logReward,
+  logQueue,
   cleanupOldLogs 
 } from "./utils/logger";
+import { findTicketByChannelId, addMessageToTicket } from "./utils/ticketHistory";
+import { TicketMessage } from "./types/tickets";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -168,8 +159,6 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
   const oldChannelId = oldState.channelId;
   const newChannelId = newState.channelId;
   const guild = oldState.guild || newState.guild;
-<<<<<<< HEAD
-=======
   
   // Обработка входа в канал отсутствий
   const ABSENCE_CHANNEL_ID = "821790755486957579";
@@ -224,7 +213,6 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       error("Ошибка при отправке формы отсутствия", err);
     }
   }
->>>>>>> feature/absence-thread-integration
   // Работаем только с очередным каналом
   if (oldChannelId === QUEUE_CHANNEL_ID || newChannelId === QUEUE_CHANNEL_ID) {
     // Получаем актуальных участников канала
@@ -355,142 +343,9 @@ function getNextStatsDelayMs() {
   return minDiff;
 }
 
-const SERVICE_ROLES = [
-  "949669576935874570",
-  "949669770377179196",
-  "949669851440496761",
-];
-const HONOR_ROLE = "1217444648591687700";
-
-const ACHIEVERS_PATH = path.join(__dirname, "..", "data", "season_achievers.json");
-
-function loadAchievers(): Set<string> {
-  if (!fs.existsSync(ACHIEVERS_PATH)) return new Set();
-  try {
-    const arr = JSON.parse(fs.readFileSync(ACHIEVERS_PATH, "utf-8"));
-    return new Set(arr);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveAchievers(set: Set<string>) {
-  fs.writeFileSync(ACHIEVERS_PATH, JSON.stringify(Array.from(set), null, 2), "utf-8");
-}
-
-function clearAchievers() {
-  fs.writeFileSync(ACHIEVERS_PATH, "[]", "utf-8");
-}
-
-async function updateAchievers(client: Client, users: Record<string, UserData>, members: { nick: string; points: number }[]) {
-  const achievers = loadAchievers();
-  const tracked = loadJson<Record<string, TrackedPlayer>>(trackedPath);
-  
-  // Сопоставим ник -> userId из users.json
-  const nickToUserId = new Map<string, string>();
-  for (const [uid, data] of Object.entries(users)) {
-    if (data.nick) {
-      nickToUserId.set(normalize(data.nick), uid);
-    }
-  }
-  
-  // Сопоставим ник -> userId из tracked.json (если нет в users.json)
-  for (const [nick, data] of Object.entries(tracked)) {
-    if (!nickToUserId.has(normalize(nick))) {
-      // Ищем пользователя в Discord сервере по никнейму
-      const guild = client.guilds.cache.first();
-      if (guild) {
-        try {
-          // Ищем по точному никнейму
-          let member = await guild.members.search({ query: nick, limit: 1 });
-          
-          // Если не найден, ищем по формату "DeDky4er (Никита)"
-          if (member.size === 0) {
-            const searchQuery = `${nick} (`;
-            const searchResults = await guild.members.search({ query: searchQuery, limit: 10 });
-            
-            // Ищем среди результатов тот, который начинается с нашего никнейма
-            for (const [memberId, memberData] of searchResults) {
-              const displayName = memberData.displayName || memberData.user.username;
-              if (displayName.startsWith(nick + ' (')) {
-                member = searchResults;
-                break;
-              }
-            }
-          }
-          
-          if (member.size > 0) {
-            const userId = member.first()?.id;
-            if (userId) {
-              nickToUserId.set(normalize(nick), userId);
-              logStats(`Найден Discord ID для ${nick}: ${userId}`);
-            }
-          }
-        } catch (e) {
-          // Игнорируем ошибки поиска
-        }
-      }
-    }
-  }
-  
-  let addedCount = 0;
-  for (const m of members) {
-    if (m.points >= 1600) {
-      const userId = nickToUserId.get(normalize(m.nick));
-      if (userId) {
-        const wasAdded = achievers.has(userId);
-        achievers.add(userId);
-        if (!wasAdded) {
-          addedCount++;
-          logStats(`Добавлено достижение для ${m.nick} (${m.points} ЛПР)`);
-        }
-      } else {
-        logStats(`Не удалось найти userId для ${m.nick} (${m.points} ЛПР) - игрок не в Discord сервере`);
-      }
-    }
-  }
-  
-  saveAchievers(achievers);
-  logStats(`Обновлены достижения: ${achievers.size} игроков с 1600+ ЛПР (добавлено новых: ${addedCount})`);
-}
-
-async function handleSeasonEndRewards(guild: Guild, users: Record<string, UserData>) {
-  const achievers = loadAchievers();
-  logReward(`Начало выдачи наград за сезон. Достигших 1600+ ЛПР: ${achievers.size}`);
-  
-  for (const userId of achievers) {
-    try {
-      const member = await guild.members.fetch(userId);
-      if (!member) continue;
-      // Сколько уже ролей "За безупречную службу"
-      const hasRoles = SERVICE_ROLES.filter(rid => member.roles.cache.has(rid));
-      // Если есть все 3 — снять их и выдать Орден
-      if (hasRoles.length === 3) {
-        await member.roles.remove(SERVICE_ROLES, "Замена на Орден Почётного Воина");
-        await member.roles.add(HONOR_ROLE, "Выдан Орден Почётного Воина за 3 службы");
-        logReward(`${member.user.tag}: сняты все службы, выдан Орден Почётного Воина`);
-      } else if (hasRoles.length < 3) {
-        // Выдать одну из недостающих ролей
-        const toGive = SERVICE_ROLES.find(rid => !member.roles.cache.has(rid));
-        if (toGive) {
-          await member.roles.add(toGive, "Выдана роль За безупречную службу за 1600+ ЛПР");
-          logReward(`${member.user.tag}: выдана служба (${toGive})`);
-        }
-      }
-    } catch (e) {
-      logReward(`Не удалось обработать ${userId}`, e);
-    }
-  }
-  clearAchievers();
-  logReward("Награды за сезон выданы, файл достижений очищен");
-}
 
 // Функция для полной синхронизации клана
-<<<<<<< HEAD
-async function performFullClanSync(client: Client) {
-=======
 async function performFullClanSync(client: Client): Promise<{ nick: string; points: number }[]> {
->>>>>>> feature/absence-thread-integration
   logSyncclan("Начало полной синхронизации клана ALLIANCE");
   
   try {
@@ -546,27 +401,6 @@ async function performFullClanSync(client: Client): Promise<{ nick: string; poin
         if (userId) {
           // Обновить данные пользователя
           users[userId].points = member.points;
-         
-          // Обновить роли
-          try {
-            const guildMember = await guild.members.fetch(userId);
-            if (guildMember) {
-              const hasServiceRole = SERVICE_ROLES.some(roleId => 
-                guildMember.roles.cache.has(roleId)
-              );
-              
-              if (member.points >= 1600 && !guildMember.roles.cache.has(HONOR_ROLE)) {
-                await guildMember.roles.add(HONOR_ROLE);
-                logSyncclan(`Добавлена роль почета для ${member.nick} (${member.points} очков)`);
-              } else if (member.points < 1600 && guildMember.roles.cache.has(HONOR_ROLE) && !hasServiceRole) {
-                await guildMember.roles.remove(HONOR_ROLE);
-                logSyncclan(`Убрана роль почета у ${member.nick} (${member.points} очков)`);
-              }
-            }
-          } catch (error) {
-            logSyncclan(`Ошибка при обновлении ролей для ${member.nick}: ${error}`);
-          }
-          
           syncCount++;
         } else {
           // Добавить в отслеживаемых
@@ -595,18 +429,12 @@ async function performFullClanSync(client: Client): Promise<{ nick: string; poin
     // 4. Сохранить новые данные в основной файл
     saveCurrentMembers(members);
     logSyncclan("Данные сохранены в основной файл участников");
-<<<<<<< HEAD
-
-  } catch (error: any) {
-    logSyncclan(`Ошибка при полной синхронизации клана: ${error.message}`);
-=======
     
     return members;
 
   } catch (error: any) {
     logSyncclan(`Ошибка при полной синхронизации клана: ${error.message}`);
     return [];
->>>>>>> feature/absence-thread-integration
   }
 }
 
@@ -634,11 +462,7 @@ async function statsScheduler(client: Client) {
       try {
         const members = await fetchClanPoints("ALLIANCE");
         
-<<<<<<< HEAD
-        // Получаем предыдущие данные из основного файла
-=======
         // Получаем предыдущие данные из members_current.json
->>>>>>> feature/absence-thread-integration
         const prev = loadCurrentMembers();
         
         // Получаем текущую информацию о лидерборде
@@ -706,15 +530,9 @@ async function statsScheduler(client: Client) {
           logStats("Статистика отправлена в канал (пропущенный сбор)");
         }
         
-<<<<<<< HEAD
-        // Сохраняем новые данные в основной файл
-        saveCurrentMembers(members);
-        logStats("Обновлен основной файл участников новыми данными (пропущенный сбор)");
-=======
         // Обновляем members_current.json новыми данными
         saveCurrentMembers(members);
         logStats("Обновлен members_current.json новыми данными (пропущенный сбор)");
->>>>>>> feature/absence-thread-integration
         
         // Проверка конца сезона: все points = 0
         logStats(`Проверка конца сезона (пропущенный сбор): получено ${members.length} участников`);
@@ -726,12 +544,7 @@ async function statsScheduler(client: Client) {
         
         // Проверка конца сезона: все points = 0
         if (members.length > 0 && members.every(p => p.points === 0)) {
-          logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
-          const users = loadJson<Record<string, UserData>>(usersPath);
-          const guild = client.guilds.cache.first();
-          if (guild) {
-            await handleSeasonEndRewards(guild, users);
-          }
+          logStats("Обнаружен конец сезона (все очки = 0)");
         }
         
         // Отмечаем, что сбор статистики 01:20 выполнен
@@ -756,11 +569,7 @@ async function statsScheduler(client: Client) {
     logStats("Полная синхронизация клана и сбор статистики (16:50)");
     
     // Выполняем полную синхронизацию клана
-<<<<<<< HEAD
-    await performFullClanSync(client);
-=======
     const members = await performFullClanSync(client);
->>>>>>> feature/absence-thread-integration
     
     // Получаем информацию о месте полка в лидерборде
     logStats("Получение информации о месте полка в лидерборде...");
@@ -777,14 +586,6 @@ async function statsScheduler(client: Client) {
       logStats("Не удалось получить информацию о лидерборде");
     }
     
-    // Обновляем достижения
-<<<<<<< HEAD
-    const members = loadCurrentMembers();
-=======
->>>>>>> feature/absence-thread-integration
-    const users = loadJson<Record<string, UserData>>(usersPath);
-    await updateAchievers(client, users, members);
-    
     // Отмечаем, что синхронизация 16:50 выполнена
     markStatsCollectionCompleted("16:50", "sync");
     logStats("Синхронизация 16:50 отмечена как выполненная");
@@ -794,11 +595,7 @@ async function statsScheduler(client: Client) {
     try {
       const members = await fetchClanPoints("ALLIANCE");
       
-<<<<<<< HEAD
-      // Получаем предыдущие данные из основного файла
-=======
       // Получаем предыдущие данные из members_current.json
->>>>>>> feature/absence-thread-integration
       const prev = loadCurrentMembers();
       
       // Получаем текущую информацию о лидерборде
@@ -813,8 +610,15 @@ async function statsScheduler(client: Client) {
         }
       } catch (error) {
         logStats(`Ошибка при получении информации о лидерборде: ${error}`);
+        currentLeaderboardInfo = null; // Явно устанавливаем null при ошибке
       }
+      
       const previousLeaderboardData = loadLeaderboardData();
+      if (previousLeaderboardData) {
+        logStats(`Загружены предыдущие данные лидерборда: место ${previousLeaderboardData.position}, очки ${previousLeaderboardData.points} (${previousLeaderboardData.date})`);
+      } else {
+        logStats("Предыдущие данные лидерборда не найдены");
+      }
       
       // Сравнить и отправить статистику
       const { totalDelta, changes } = compareMembersData(prev, members);
@@ -849,6 +653,13 @@ async function statsScheduler(client: Client) {
       } else if (currentLeaderboardInfo) {
         msg += `🏆 **Место в лидерборде:** ${currentLeaderboardInfo.position}\n`;
         msg += `💎 **Очки полка:** ${currentLeaderboardInfo.points.toLocaleString()}\n\n`;
+      } else if (previousLeaderboardData) {
+        // Fallback: используем предыдущие данные, если текущие получить не удалось
+        msg += `🏆 **Место в лидерборде:** ${previousLeaderboardData.position} (данные за ${previousLeaderboardData.date})\n`;
+        msg += `💎 **Очки полка:** ${previousLeaderboardData.points.toLocaleString()}\n`;
+        msg += `⚠️ *Текущие данные лидерборда недоступны*\n\n`;
+      } else {
+        msg += `❌ **Информация о лидерборде недоступна**\n\n`;
       }
       
       msg += `Полк всего: ${totalDelta >= 0 ? "+" : ""}${totalDelta} очков\n`;
@@ -868,15 +679,9 @@ async function statsScheduler(client: Client) {
         logStats("Статистика отправлена в канал");
       }
       
-<<<<<<< HEAD
-      // Сохраняем новые данные в основной файл
-      saveCurrentMembers(members);
-      logStats("Обновлен основной файл участников новыми данными");
-=======
       // Обновляем members_current.json новыми данными
       saveCurrentMembers(members);
       logStats("Обновлен members_current.json новыми данными");
->>>>>>> feature/absence-thread-integration
       
       // Проверка конца сезона: все points = 0
       logStats(`Проверка конца сезона: получено ${members.length} участников`);
@@ -888,12 +693,7 @@ async function statsScheduler(client: Client) {
       
       // Проверка конца сезона: все points = 0
       if (members.length > 0 && members.every(p => p.points === 0)) {
-        logStats("Обнаружен конец сезона (все очки = 0), запуск выдачи наград");
-        const users = loadJson<Record<string, UserData>>(usersPath);
-        const guild = client.guilds.cache.first();
-        if (guild) {
-          await handleSeasonEndRewards(guild, users);
-        }
+        logStats("Обнаружен конец сезона (все очки = 0)");
       }
       
       // Отмечаем, что сбор статистики 01:20 выполнен
@@ -1021,8 +821,6 @@ client.once("ready", async () => {
   autoPbAnnounceScheduler(client);
   statsScheduler(client);
   syncclanScheduler(client);
-<<<<<<< HEAD
-=======
   
   // Запускаем сервис автоматического тестирования
   try {
@@ -1031,7 +829,6 @@ client.once("ready", async () => {
   } catch (error) {
     warn(`⚠️ Не удалось запустить сервис автоматического тестирования: ${error}`);
   }
->>>>>>> feature/absence-thread-integration
 });
 
 client.on("guildMemberAdd", (member: GuildMember) => {
@@ -1049,6 +846,37 @@ client.on("guildMemberAdd", (member: GuildMember) => {
   }
 });
 
+// Обработчик сообщений в тикетах
+client.on("messageCreate", async (message) => {
+  try {
+    // Игнорируем сообщения ботов
+    if (message.author.bot) return;
+    
+    // Проверяем, является ли канал тикетом
+    const ticket = findTicketByChannelId(message.channel.id);
+    if (!ticket) return;
+    
+    // Создаём запись о сообщении
+    const ticketMessage: TicketMessage = {
+      id: message.id,
+      authorId: message.author.id,
+      authorName: message.member?.displayName || message.author.username,
+      content: message.content,
+      timestamp: message.createdAt.toISOString(),
+      isSystem: false,
+      attachments: message.attachments.map(att => att.url)
+    };
+    
+    // Сохраняем сообщение в историю
+    addMessageToTicket(message.channel.id, ticketMessage);
+    
+    info(`[TICKET] Сообщение сохранено в тикет ${ticket.id}: ${message.author.tag}`);
+    
+  } catch (err) {
+    error("Ошибка при сохранении сообщения в тикете", err);
+  }
+});
+
 process.on("unhandledRejection", (reason, promise) => {
   error("Необработанное отклонение промиса", { reason, promise });
 });
@@ -1057,8 +885,6 @@ process.on("uncaughtException", (err) => {
   error("Необработанное исключение", err);
 });
 
-<<<<<<< HEAD
-=======
 // Graceful shutdown
 process.on("SIGINT", () => {
   info("🛑 Получен сигнал SIGINT, завершение работы...");
@@ -1071,6 +897,4 @@ process.on("SIGTERM", () => {
   autoTestService.stop();
   process.exit(0);
 });
-
->>>>>>> feature/absence-thread-integration
 export { client, voiceCounts };

@@ -17,7 +17,8 @@
     "git:commit": "git commit -m \"Update: automated commit\"",
     "git:push": "git push",
     "push": "npm run git:add && npm run git:commit && npm run git:push",
-    "push:msg": "git add . && git commit && git push"
+    "push:msg": "git add . && git commit && git push",
+    "watch:git": "ts-node git-watcher.ts"
   },
   "keywords": [],
   "author": "",

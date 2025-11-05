@@ -17,6 +17,8 @@ import {
 import { info, error } from "../utils/logger.js";
 import { FLIGHT_ACADEMY_CHANNEL_ID, FLIGHT_ACADEMY_NOTIFY_USER_ID, FLIGHT_ACADEMY_OFFICER_ROLE_IDS } from "../constants.js";
 import { getAircraftByType, getAircraftTypeByLicenseId, getAircraftTypeBySkillId, createAircraftOptions } from "../utils/aircraft.js";
+import { createTicket, addMessageToTicket, closeTicket, publishTicketToHistory, findTicketByChannelId } from "../utils/ticketHistory.js";
+import { TicketMessage } from "../types/tickets.js";
 
 // Функция для получения отображаемого имени пользователя на сервере
 function getUserDisplayName(interaction: any): string {
@@ -488,7 +490,7 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
     }
 
     // Обработка закрытия тикета
-    if (interaction.customId.startsWith("close_ticket_")) {
+    if (interaction.customId.startsWith("close_ticket_") && !interaction.customId.includes("completed") && !interaction.customId.includes("failed") && !interaction.customId.includes("cancelled") && !interaction.customId.includes("other")) {
       try {
         info(`[FLIGHT-ACADEMY] Пользователь ${interaction.user.tag} закрывает тикет`);
         
@@ -515,7 +517,7 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
 
         const hasPermission = FLIGHT_ACADEMY_OFFICER_ROLE_IDS.some(roleId => 
           member.roles.cache.has(roleId)
-        ) || channel.name.includes(interaction.user.username); // Создатель тикета
+        );
 
         if (!hasPermission) {
           await interaction.reply({
@@ -525,20 +527,220 @@ export async function handleButtonInteraction(interaction: ButtonInteraction) {
           return;
         }
 
-        // Закрываем тикет
-        await channel.delete();
-        
-        await interaction.reply({
-          content: "✅ Тикет успешно закрыт",
-          ephemeral: true
-        });
+        // Определяем тип тикета по названию канала
+        const isLicenseTicket = channel.name.includes("лицензия");
+        const isTrainingTicket = channel.name.includes("обучение");
 
-        info(`[FLIGHT-ACADEMY] Тикет ${channel.name} закрыт пользователем ${interaction.user.tag}`);
+        if (isTrainingTicket) {
+          // Для тикетов обучения показываем модальное окно с выбором причины и комментарием
+          info(`[FLIGHT-ACADEMY] Показываем модальное окно для закрытия тикета обучения: ${channelId}`);
+          
+          const modal = new ModalBuilder()
+            .setCustomId(`close_ticket_modal_${channelId}`)
+            .setTitle("Закрытие тикета обучения");
+
+          const reasonSelect = new TextInputBuilder()
+            .setCustomId("close_reason")
+            .setLabel("Причина закрытия")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Например: Обучение завершено успешно")
+            .setRequired(true);
+
+          const commentInput = new TextInputBuilder()
+            .setCustomId("close_comment")
+            .setLabel("Комментарий по тикету")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Опишите что изучили, эффективность обучения, приобретенные навыки, рекомендации...")
+            .setRequired(true);
+
+          modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(reasonSelect),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(commentInput)
+          );
+
+          await interaction.showModal(modal);
+          return;
+
+        } else if (isLicenseTicket) {
+          // Для тикетов лицензий показываем выбор причины
+          const embed = new EmbedBuilder()
+            .setTitle("🔒 Закрытие тикета")
+            .setDescription("Выберите причину закрытия тикета:")
+            .setColor(0xff6b6b)
+            .setTimestamp();
+
+          const row1 = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+              new ButtonBuilder()
+                .setCustomId(`close_ticket_completed_${channelId}`)
+                .setLabel("✅ Лицензия сдана")
+                .setStyle(ButtonStyle.Success),
+              new ButtonBuilder()
+                .setCustomId(`close_ticket_failed_${channelId}`)
+                .setLabel("❌ Лицензия не сдана")
+                .setStyle(ButtonStyle.Danger)
+            );
+
+          const row2 = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+              new ButtonBuilder()
+                .setCustomId(`close_ticket_cancelled_${channelId}`)
+                .setLabel("🚫 Отменён")
+                .setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder()
+                .setCustomId(`close_ticket_other_${channelId}`)
+                .setLabel("📝 Другая причина")
+                .setStyle(ButtonStyle.Primary)
+            );
+
+          await interaction.reply({
+            embeds: [embed],
+            components: [row1, row2],
+            ephemeral: true
+          });
+        } else {
+          // Неизвестный тип тикета - закрываем с причиной "other"
+          info(`[FLIGHT-ACADEMY] Закрываем неизвестный тип тикета: ${channelId}`);
+          
+          closeTicket(channelId, interaction.user.username, 'other');
+
+          // Публикуем тикет в канал истории
+          const ticket = findTicketByChannelId(channelId);
+          if (ticket) {
+            try {
+              await publishTicketToHistory(interaction.client, ticket.id);
+              info(`[FLIGHT-ACADEMY] Тикет ${ticket.id} опубликован в канал истории`);
+            } catch (publishErr) {
+              error(`[FLIGHT-ACADEMY] Ошибка при публикации тикета ${ticket.id} в канал истории:`, publishErr);
+            }
+          }
+
+          const closeMessage: TicketMessage = {
+            id: `close_${Date.now()}`,
+            authorId: 'system',
+            authorName: 'Система',
+            content: `Тикет закрыт пользователем ${interaction.user.username}\n**Причина:** 📝 Другая причина`,
+            timestamp: new Date().toISOString(),
+            isSystem: true
+          };
+          addMessageToTicket(channelId, closeMessage);
+
+          if (channel && channel.isTextBased()) {
+            await channel.delete();
+          }
+
+          await interaction.reply({
+            content: `✅ Тикет успешно закрыт`,
+            ephemeral: true
+          });
+        }
 
       } catch (err) {
         error(`[FLIGHT-ACADEMY] Ошибка при закрытии тикета:`, err);
         await interaction.reply({
           content: "❌ Произошла ошибка при закрытии тикета",
+          ephemeral: true
+        });
+      }
+      return;
+    }
+
+    // Обработка выбора причины закрытия тикета
+    if (interaction.customId.startsWith("close_ticket_completed_") || 
+        interaction.customId.startsWith("close_ticket_failed_") || 
+        interaction.customId.startsWith("close_ticket_cancelled_") || 
+        interaction.customId.startsWith("close_ticket_other_")) {
+      
+      try {
+        info(`[FLIGHT-ACADEMY] Обрабатываем выбор причины закрытия: ${interaction.customId}`);
+        
+        // Извлекаем channelId и reason из customId
+        const parts = interaction.customId.split("_");
+        const reason = parts[2] as 'completed' | 'failed' | 'cancelled' | 'other';
+        const channelId = parts.slice(3).join("_");
+        
+        info(`[FLIGHT-ACADEMY] Извлеченные данные: customId=${interaction.customId}, parts=${JSON.stringify(parts)}, reason=${reason}, channelId=${channelId}`);
+        
+        const channel = interaction.guild?.channels.cache.get(channelId);
+        if (!channel || !channel.isTextBased()) {
+          await interaction.reply({
+            content: "❌ Тикет не найден или недоступен",
+            ephemeral: true
+          });
+          return;
+        }
+
+        // Проверяем права пользователя
+        const member = interaction.member;
+        if (!member || !('displayName' in member)) {
+          await interaction.reply({
+            content: "❌ Не удалось проверить ваши права",
+            ephemeral: true
+          });
+          return;
+        }
+
+        const hasPermission = FLIGHT_ACADEMY_OFFICER_ROLE_IDS.some(roleId => 
+          member.roles.cache.has(roleId)
+        );
+
+        if (!hasPermission) {
+          await interaction.reply({
+            content: "❌ У вас нет прав на закрытие этого тикета",
+            ephemeral: true
+          });
+          return;
+        }
+
+        // Закрываем тикет в JSON
+        closeTicket(channelId, interaction.user.username, reason);
+
+        // Публикуем тикет в канал истории
+        const ticket = findTicketByChannelId(channelId);
+        if (ticket) {
+          try {
+            await publishTicketToHistory(interaction.client, ticket.id);
+            info(`[FLIGHT-ACADEMY] Тикет ${ticket.id} опубликован в канал истории`);
+          } catch (publishErr) {
+            error(`[FLIGHT-ACADEMY] Ошибка при публикации тикета ${ticket.id} в канал истории:`, publishErr);
+          }
+        }
+
+        // Создаём системное сообщение о закрытии тикета
+        const reasonText = {
+          'completed': '✅ Лицензия сдана успешно',
+          'failed': '❌ Лицензия не сдана',
+          'cancelled': '🚫 Тикет отменён',
+          'other': '📝 Другая причина'
+        }[reason];
+
+        const closeMessage: TicketMessage = {
+          id: `close_${Date.now()}`,
+          authorId: 'system',
+          authorName: 'Система',
+          content: `Тикет закрыт пользователем ${interaction.user.username}\n**Причина:** ${reasonText}`,
+          timestamp: new Date().toISOString(),
+          isSystem: true
+        };
+        addMessageToTicket(channelId, closeMessage);
+
+        // Получаем канал и закрываем его
+        if (channel && channel.isTextBased()) {
+          await channel.delete();
+        }
+
+        await interaction.reply({
+          content: `✅ Тикет успешно закрыт. Причина: ${reasonText}`,
+          ephemeral: true
+        });
+
+        info(`[FLIGHT-ACADEMY] Тикет ${channelId} закрыт пользователем ${interaction.user.tag} с причиной: ${reason}`);
+
+      } catch (err) {
+        error(`[FLIGHT-ACADEMY] Ошибка при закрытии тикета:`, err);
+        console.error(`[FLIGHT-ACADEMY] Детали ошибки:`, err);
+        await interaction.reply({
+          content: `❌ Произошла ошибка при закрытии тикета: ${err instanceof Error ? err.message : 'Неизвестная ошибка'}`,
           ephemeral: true
         });
       }
@@ -702,7 +904,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         selectedAircraft = aircraft.find(a => a.name === aircraftName);
         
         if (selectedAircraft) {
-          info(`[FLIGHT-ACADEMY] Самолёт найден: ${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})`);
+          info(`[FLIGHT-ACADEMY] Самолёт найден: ${selectedAircraft.name}`);
         } else {
           info(`[FLIGHT-ACADEMY] Самолёт "${aircraftName}" не найден в списке ${aircraftType}`);
           info(`[FLIGHT-ACADEMY] Доступные самолёты: ${aircraft.map(a => a.name).join(", ")}`);
@@ -726,95 +928,221 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
       // Добавляем информацию о выбранном самолёте, если есть
       if (selectedAircraft) {
         applicationEmbed.addFields(
-          { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})`, inline: false }
+          { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name}`, inline: false }
         );
       }
 
       applicationEmbed.addFields({ name: "🧪 Тесты", value: license.tests.join(", "), inline: false });
 
-      // Создаём канал-тикет для заявки
+        // Создаём канал-тикет для заявки
+        try {
+          info(`[FLIGHT-ACADEMY] Создаём канал-тикет для заявки на лицензию ${license.name}`);
+          
+          const guild = interaction.guild;
+          if (!guild) {
+            throw new Error("Не удалось получить информацию о сервере");
+          }
+
+          // Создаём название канала
+          const channelName = `🎓-лицензия-${interaction.user.username}-${Date.now().toString().slice(-4)}`;
+          
+          // Создаём канал
+          const ticketChannel = await guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            // parent: FLIGHT_ACADEMY_TICKET_CATEGORY_ID, // Временно убираем категорию
+            permissionOverwrites: [
+              {
+                id: guild.id, // @everyone
+                deny: [PermissionFlagsBits.ViewChannel]
+              },
+              {
+                id: interaction.user.id, // Создатель тикета
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+              },
+              // Добавляем права для офицеров
+              ...FLIGHT_ACADEMY_OFFICER_ROLE_IDS.map((roleId: string) => ({
+                id: roleId,
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
+              }))
+            ]
+          });
+
+          info(`[FLIGHT-ACADEMY] Канал-тикет создан: ${ticketChannel.name}`);
+
+          // Создаём запись о тикете в JSON
+          const ticketId = `license_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const ticketData = createTicket({
+            id: ticketId,
+            channelId: ticketChannel.id,
+            type: 'license',
+            title: `Лицензия: ${license.name}`,
+            userId: interaction.user.id,
+            username: interaction.user.username,
+            displayName: getUserDisplayName(interaction),
+            createdAt: new Date().toISOString(),
+            status: 'open',
+            applicationData: {
+              licenseType: license.name,
+              aircraftName: selectedAircraft?.name,
+              experience,
+              motivation
+            }
+          });
+
+          // Создаём системное сообщение о создании тикета
+          const systemMessage: TicketMessage = {
+            id: `system_${Date.now()}`,
+            authorId: 'system',
+            authorName: 'Система',
+            content: `Тикет создан для заявки на лицензию **${license.name}**`,
+            timestamp: new Date().toISOString(),
+            isSystem: true
+          };
+          addMessageToTicket(ticketChannel.id, systemMessage);
+
+          // Отправляем embed с заявкой в тикет
+          const ticketEmbed = new EmbedBuilder()
+            .setTitle("🎓 Заявка на лицензию")
+            .setColor(0x00ff00)
+            .addFields(
+              { name: "👤 Пользователь Discord", value: `${getUserDisplayName(interaction)} (${interaction.user.id})`, inline: true },
+              { name: "✈️ Лицензия", value: `${license.name} (БР ${license.brRange})`, inline: true },
+              { name: "📚 Опыт", value: experience, inline: false },
+              { name: "🎯 Мотивация", value: motivation, inline: false }
+            )
+            .setFooter({ text: "Лётная академия War Thunder - Лицензия" });
+
+          // Добавляем информацию о выбранном самолёте, если есть
+          if (selectedAircraft) {
+            ticketEmbed.addFields(
+              { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name}`, inline: false }
+            );
+          }
+
+          ticketEmbed.addFields({ name: "🧪 Тесты", value: license.tests.join(", "), inline: false });
+
+          // Создаём кнопку для закрытия тикета
+          const closeButton = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+              new ButtonBuilder()
+                .setCustomId(`close_ticket_${ticketChannel.id}`)
+                .setLabel("🔒 Закрыть тикет")
+                .setStyle(ButtonStyle.Danger)
+                .setEmoji("🔒")
+            );
+
+          // Отправляем заявку в тикет
+          const sentMessage = await ticketChannel.send({ embeds: [ticketEmbed], components: [closeButton] });
+          
+          // Сохраняем сообщение заявки в историю
+          const applicationMessage: TicketMessage = {
+            id: sentMessage.id,
+            authorId: 'system',
+            authorName: 'Система',
+            content: `**Заявка на лицензию ${license.name}**\n\n**Опыт:** ${experience}\n\n**Мотивация:** ${motivation}${selectedAircraft ? `\n\n**Самолёт:** ${selectedAircraft.name}` : ''}`,
+            timestamp: new Date().toISOString(),
+            isSystem: true
+          };
+          addMessageToTicket(ticketChannel.id, applicationMessage);
+          
+          // Подтверждаем пользователю
+          info(`[FLIGHT-ACADEMY] Отправляем подтверждение пользователю ${interaction.user.tag}`);
+          await interaction.reply({
+            content: `✅ Ваша заявка на лицензию **${license.name}** успешно создана! Тикет: ${ticketChannel}`,
+            ephemeral: true
+          });
+
+          info(`[FLIGHT-ACADEMY] Заявка на лицензию ${license.name} от ${interaction.user.tag} успешно обработана, тикет создан`);
+
+        } catch (ticketError) {
+          error(`[FLIGHT-ACADEMY] Ошибка при создании тикета для заявки на лицензию ${license.name}:`, ticketError);
+          console.error(`[FLIGHT-ACADEMY] Детали ошибки:`, ticketError);
+          await interaction.reply({
+            content: `❌ Произошла ошибка при создании тикета: ${ticketError instanceof Error ? ticketError.message : 'Неизвестная ошибка'}`,
+            ephemeral: true
+          });
+        }
+      return;
+    }
+
+    // Обработка закрытия тикета
+    if (interaction.customId.startsWith("close_ticket_modal_")) {
+      info(`[FLIGHT-ACADEMY] Обрабатываем закрытие тикета: ${interaction.customId}`);
+      
+      const channelId = interaction.customId.replace("close_ticket_modal_", "");
+      const reason = interaction.fields.getTextInputValue("close_reason");
+      const comment = interaction.fields.getTextInputValue("close_comment");
+      
+      // Проверяем, есть ли поле close_details (для старых тикетов лицензий)
+      let details = "";
       try {
-        info(`[FLIGHT-ACADEMY] Создаём канал-тикет для заявки на лицензию ${license.name}`);
+        details = interaction.fields.getTextInputValue("close_details");
+      } catch (e) {
+        // Поле close_details не найдено, это новый формат для тикетов обучения
+        details = comment;
+      }
+      
+      try {
+        // Закрываем тикет в JSON
+        closeTicket(channelId, interaction.user.username, reason, details);
         
-        const guild = interaction.guild;
-        if (!guild) {
-          throw new Error("Не удалось получить информацию о сервере");
+        // Публикуем тикет в канал истории
+        const ticket = findTicketByChannelId(channelId);
+        if (ticket) {
+          try {
+            await publishTicketToHistory(interaction.client, ticket.id);
+            info(`[FLIGHT-ACADEMY] Тикет ${ticket.id} опубликован в канал истории`);
+          } catch (publishErr) {
+            error(`[FLIGHT-ACADEMY] Ошибка при публикации тикета ${ticket.id} в канал истории:`, publishErr);
+          }
         }
-
-        // Создаём название канала
-        const channelName = `🎓-лицензия-${interaction.user.username}-${Date.now().toString().slice(-4)}`;
         
-        // Создаём канал
-        const ticketChannel = await guild.channels.create({
-          name: channelName,
-          type: ChannelType.GuildText,
-          // parent: FLIGHT_ACADEMY_TICKET_CATEGORY_ID, // Временно убираем категорию
-          permissionOverwrites: [
-            {
-              id: guild.id, // @everyone
-              deny: [PermissionFlagsBits.ViewChannel]
-            },
-            {
-              id: interaction.user.id, // Создатель тикета
-              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
-            },
-            // Добавляем права для офицеров
-            ...FLIGHT_ACADEMY_OFFICER_ROLE_IDS.map((roleId: string) => ({
-              id: roleId,
-              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
-            }))
-          ]
-        });
-
-        info(`[FLIGHT-ACADEMY] Канал-тикет создан: ${ticketChannel.name}`);
-
-        // Отправляем embed с заявкой в тикет
-        const ticketEmbed = new EmbedBuilder()
-          .setTitle("🎓 Заявка на лицензию")
-          .setColor(0x00ff00)
-          .addFields(
-            { name: "👤 Пользователь Discord", value: `${getUserDisplayName(interaction)} (${interaction.user.id})`, inline: true },
-            { name: "✈️ Лицензия", value: `${license.name} (БР ${license.brRange})`, inline: true },
-            { name: "📚 Опыт", value: experience, inline: false },
-            { name: "🎯 Мотивация", value: motivation, inline: false }
-          )
-          .setFooter({ text: "Лётная академия War Thunder - Лицензия" });
-
-        // Добавляем информацию о выбранном самолёте, если есть
-        if (selectedAircraft) {
-          ticketEmbed.addFields(
-            { name: "🛩️ Выбранный самолёт", value: `${selectedAircraft.name} (${selectedAircraft.nation}, БР ${selectedAircraft.br})`, inline: false }
-          );
+        // Определяем тип тикета для правильного отображения
+        const ticketChannel = interaction.guild?.channels.cache.get(channelId);
+        const isTrainingTicket = ticketChannel?.name.includes("обучение");
+        
+        // Создаём системное сообщение о закрытии тикета
+        let reasonText = reason;
+        if (isTrainingTicket) {
+          reasonText = `📝 ${reason}`;
+        } else {
+          const reasonMap = {
+            'completed': '✅ Лицензия сдана успешно',
+            'failed': '❌ Лицензия не сдана',
+            'cancelled': '🚫 Тикет отменён',
+            'other': '📝 Другая причина'
+          };
+          reasonText = reasonMap[reason as keyof typeof reasonMap] || reason;
         }
-
-        ticketEmbed.addFields({ name: "🧪 Тесты", value: license.tests.join(", "), inline: false });
-
-        // Создаём кнопку для закрытия тикета
-        const closeButton = new ActionRowBuilder<ButtonBuilder>()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId(`close_ticket_${ticketChannel.id}`)
-              .setLabel("🔒 Закрыть тикет")
-              .setStyle(ButtonStyle.Danger)
-              .setEmoji("🔒")
-          );
-
-        // Отправляем заявку в тикет
-        await ticketChannel.send({ embeds: [ticketEmbed], components: [closeButton] });
         
-        // Подтверждаем пользователю
-        info(`[FLIGHT-ACADEMY] Отправляем подтверждение пользователю ${interaction.user.tag}`);
+        const closeMessage: TicketMessage = {
+          id: `close_${Date.now()}`,
+          authorId: 'system',
+          authorName: 'Система',
+          content: `Тикет закрыт пользователем ${interaction.user.username}\n**Причина:** ${reasonText}${details ? `\n**Комментарий:** ${details}` : ''}`,
+          timestamp: new Date().toISOString(),
+          isSystem: true
+        };
+        addMessageToTicket(channelId, closeMessage);
+
+        // Отвечаем на взаимодействие ПЕРЕД удалением канала
         await interaction.reply({
-          content: `✅ Ваша заявка на лицензию **${license.name}** успешно создана! Тикет: ${ticketChannel}`,
+          content: `✅ Тикет успешно закрыт. Причина: ${reasonText}`,
           ephemeral: true
         });
 
-        info(`[FLIGHT-ACADEMY] Заявка на лицензию ${license.name} от ${interaction.user.tag} успешно обработана, тикет создан`);
+        // Получаем канал и закрываем его
+        if (ticketChannel && ticketChannel.isTextBased()) {
+          await ticketChannel.delete();
+        }
 
-      } catch (ticketError) {
-        error(`[FLIGHT-ACADEMY] Ошибка при создании тикета для заявки на лицензию ${license.name}:`, ticketError);
+        info(`[FLIGHT-ACADEMY] Тикет ${channelId} закрыт пользователем ${interaction.user.tag} с причиной: ${reason}`);
+        
+      } catch (err) {
+        error(`[FLIGHT-ACADEMY] Ошибка при закрытии тикета ${channelId}:`, err);
         await interaction.reply({
-          content: "❌ Произошла ошибка при создании тикета. Попробуйте позже или обратитесь к администратору.",
+          content: "❌ Произошла ошибка при закрытии тикета",
           ephemeral: true
         });
       }
@@ -857,27 +1185,110 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction) {
         )
         .setFooter({ text: "Лётная академия War Thunder - Обучение навыкам" });
 
-      // Отправляем уведомление в личные сообщения
+      // Создаём канал-тикет для заявки на обучение
       try {
-        info(`[FLIGHT-ACADEMY] Отправляем уведомление пользователю ${FLIGHT_ACADEMY_NOTIFY_USER_ID}`);
-        const user = await interaction.client.users.fetch(FLIGHT_ACADEMY_NOTIFY_USER_ID);
-        info(`[FLIGHT-ACADEMY] Пользователь найден: ${user.tag}`);
-        await user.send({ embeds: [trainingEmbed] });
-        info(`[FLIGHT-ACADEMY] DM отправлен пользователю ${user.tag}`);
+        info(`[FLIGHT-ACADEMY] Создаём канал-тикет для заявки на обучение навыку ${skill.name}`);
+        
+        const guild = interaction.guild;
+        if (!guild) {
+          throw new Error("Не удалось получить информацию о сервере");
+        }
+
+        // Создаём название канала
+        const channelName = `🎯-обучение-${interaction.user.username}-${Date.now().toString().slice(-4)}`;
+        
+        // Создаём канал
+        const ticketChannel = await guild.channels.create({
+          name: channelName,
+          type: ChannelType.GuildText,
+          // parent: FLIGHT_ACADEMY_TICKET_CATEGORY_ID, // Временно убираем категорию
+          permissionOverwrites: [
+            {
+              id: guild.id, // @everyone
+              deny: [PermissionFlagsBits.ViewChannel]
+            },
+            {
+              id: interaction.user.id, // Создатель тикета
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory]
+            },
+            // Добавляем права для офицеров
+            ...FLIGHT_ACADEMY_OFFICER_ROLE_IDS.map((roleId: string) => ({
+              id: roleId,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages]
+            }))
+          ]
+        });
+
+        info(`[FLIGHT-ACADEMY] Канал-тикет создан: ${ticketChannel.name}`);
+
+        // Создаём запись о тикете в JSON
+        const ticketId = `training_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const ticketData = createTicket({
+          id: ticketId,
+          channelId: ticketChannel.id,
+          type: 'training',
+          title: `Обучение: ${skill.name}`,
+          userId: interaction.user.id,
+          username: interaction.user.username,
+          displayName: getUserDisplayName(interaction),
+          createdAt: new Date().toISOString(),
+          status: 'open',
+          applicationData: {
+            skillType: skill.name,
+            experience,
+            currentSkill,
+            goals
+          }
+        });
+
+        // Создаём системное сообщение о создании тикета
+        const systemMessage: TicketMessage = {
+          id: `system_${Date.now()}`,
+          authorId: 'system',
+          authorName: 'Система',
+          content: `Тикет создан для заявки на обучение навыку **${skill.name}**`,
+          timestamp: new Date().toISOString(),
+          isSystem: true
+        };
+        addMessageToTicket(ticketChannel.id, systemMessage);
+
+        // Создаём кнопку для закрытия тикета
+        const closeButton = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId(`close_ticket_${ticketChannel.id}`)
+              .setLabel("🔒 Закрыть тикет")
+              .setStyle(ButtonStyle.Danger)
+              .setEmoji("🔒")
+          );
+
+        // Отправляем заявку в тикет
+        const sentMessage = await ticketChannel.send({ embeds: [trainingEmbed], components: [closeButton] });
+        
+        // Сохраняем сообщение заявки в историю
+        const applicationMessage: TicketMessage = {
+          id: sentMessage.id,
+          authorId: 'system',
+          authorName: 'Система',
+          content: `**Заявка на обучение навыку ${skill.name}**\n\n**Опыт:** ${experience}\n\n**Текущий уровень:** ${currentSkill}\n\n**Цели обучения:** ${goals}`,
+          timestamp: new Date().toISOString(),
+          isSystem: true
+        };
+        addMessageToTicket(ticketChannel.id, applicationMessage);
         
         // Подтверждаем пользователю
         info(`[FLIGHT-ACADEMY] Отправляем подтверждение пользователю ${interaction.user.tag}`);
         await interaction.reply({
-          content: `✅ Ваша заявка на обучение навыку **${skill.name}** успешно отправлена! Ожидайте ответа в личных сообщениях.`,
+          content: `✅ Ваша заявка на обучение навыку **${skill.name}** успешно создана! Тикет: ${ticketChannel}`,
           ephemeral: true
         });
 
-        info(`[FLIGHT-ACADEMY] Заявка на обучение навыку ${skill.name} от ${interaction.user.tag} успешно обработана`);
+        info(`[FLIGHT-ACADEMY] Заявка на обучение навыку ${skill.name} от ${interaction.user.tag} успешно обработана, тикет создан`);
 
-      } catch (dmError) {
-        error(`[FLIGHT-ACADEMY] Ошибка при отправке DM для заявки на обучение навыку ${skill.name}:`, dmError);
+      } catch (ticketError) {
+        error(`[FLIGHT-ACADEMY] Ошибка при создании тикета для заявки на обучение навыку ${skill.name}:`, ticketError);
         await interaction.reply({
-          content: "❌ Произошла ошибка при отправке заявки. Попробуйте позже или обратитесь к администратору.",
+          content: "❌ Произошла ошибка при создании тикета. Попробуйте позже или обратитесь к администратору.",
           ephemeral: true
         });
       }

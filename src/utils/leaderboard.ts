@@ -3,8 +3,9 @@ import * as cheerio from "cheerio";
 import * as fs from "fs";
 import * as path from "path";
 import puppeteer from "puppeteer";
+import { getDataFilePath } from "./paths";
 
-const leaderboardDataPath = path.join(__dirname, "..", "data", "leaderboard_data.json");
+const leaderboardDataPath = getDataFilePath("leaderboard_data.json");
 
 interface LeaderboardData {
   date: string;

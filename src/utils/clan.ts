@@ -2,11 +2,12 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import * as fs from "fs";
 import * as path from "path";
+import { getDataFilePath } from "./paths";
 
-const membersAPath = path.join(__dirname, "..", "data", "members_a.json");
-const membersBPath = path.join(__dirname, "..", "data", "members_b.json");
-const statePath = path.join(__dirname, "..", "data", "members_state.json");
-const leaversTrackingPath = path.join(__dirname, "..", "data", "leavers_tracking.json");
+const membersAPath = getDataFilePath("members_a.json");
+const membersBPath = getDataFilePath("members_b.json");
+const statePath = getDataFilePath("members_state.json");
+const leaversTrackingPath = getDataFilePath("leavers_tracking.json");
 
 export async function fetchClanPoints(
   clanTag: string,
@@ -53,7 +54,10 @@ export async function fetchClanPoints(
     
     playerLinks.each((index, element) => {
       const $link = $(element);
-      const nick = $link.text().trim();
+      let nick = $link.text().trim();
+      
+      // Декодируем HTML entities и нормализуем пробелы
+      nick = nick.replace(/\s+/g, " ").trim();
       
       if (nick && nick.length > 1 && !nick.match(/^\d+$/)) {
         // Ищем очки для этого игрока
@@ -92,7 +96,7 @@ export async function fetchClanPoints(
         // Проверяем, что это правильный паттерн
         if (dateLine.match(/^\d{2}\.\d{2}\.\d{4}$/) && // дата
             numberLine.match(/^\d+$/) && // номер
-            nickLine.match(/^[A-Za-z0-9_\-\.]+$/) && // никнейм
+            nickLine.length > 0 && nickLine.length < 50 && // никнейм (любые символы, включая русские)
             pointsLine.match(/^\d+$/) && // очки
             activityLine.match(/^\d+$/)) { // активность
           
@@ -221,7 +225,20 @@ export function loadMembersAtTime(
 }
 
 function normalizeNick(nick: string) {
-  return nick.toLowerCase().replace(/\s+/g, "").trim();
+  // Нормализуем никнейм: приводим к нижнему регистру, убираем все виды пробелов и спецсимволов
+  // Важно: toLowerCase() корректно работает с русскими символами в Unicode
+  // Обрабатываем различные типы пробелов (обычные, неразрывные, табы и т.д.)
+  if (!nick || typeof nick !== 'string') {
+    return '';
+  }
+  
+  return nick
+    .toLowerCase()
+    .normalize('NFKC') // Нормализуем Unicode (объединяем похожие символы)
+    .replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\uFEFF]+/g, "") // Убираем все виды пробелов
+    .replace(/[\u200C\u200D\u034F\u180E]/g, "") // Убираем невидимые символы
+    .replace(/[\u202A-\u202E\u2060-\u2064]/g, "") // Убираем directional formatting и word joiner
+    .trim();
 }
 
 export function findLeavers(
@@ -255,7 +272,7 @@ export function findLeaversFromTracking(
 }
 
 // Новые функции для работы с одним файлом участников
-const membersCurrentPath = path.join(__dirname, "..", "data", "members_current.json");
+const membersCurrentPath = getDataFilePath("members_current.json");
 
 // Сохраняет текущих участников в основной файл
 export function saveCurrentMembers(

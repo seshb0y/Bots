@@ -15,7 +15,60 @@ import { simpleTestCommand } from "./simple-test";
 import { lichstatCommand } from "./lichstat";
 import { runtestsCommand } from "./runtests";
 import { execute as flightAcademyCommand, handleButtonInteraction as flightAcademyButton, handleModalSubmit as flightAcademyModal, handleAircraftSelect as flightAcademyAircraftSelect } from "./flight-academy";
-import { aircraftListCommand, aircraftAddCommand, aircraftRemoveCommand, aircraftUpdateCommand, handleAircraftTypeSelect, handleAircraftListBack } from "./aircraft";
+import { 
+  aircraftListCommand, 
+  aircraftAddCommand, 
+  aircraftRemoveCommand, 
+  aircraftUpdateCommand, 
+  handleAircraftTypeSelect,
+  handleAircraftAddModal,
+  handleAircraftRemoveTypeSelect,
+  handleAircraftRemoveSelect,
+  handleAircraftUpdateTypeSelect,
+  handleAircraftUpdateSelect,
+  handleAircraftUpdateModal
+} from "./aircraft";
+import { 
+  absenceformCommand, 
+  absencelistCommand, 
+  handleAbsenceFormButton, 
+  handleAbsenceFormModal, 
+  handleAbsenceTicketButton 
+} from "./absenceform";
+import { 
+  execute as ticketHistoryCommand, 
+  handleTicketHistoryButton 
+} from "./ticket-history";
+import { 
+  execute as publishTicketsCommand, 
+  handlePublishedTicketButton 
+} from "./publish-tickets";
+import {
+  twinkHelpCommand,
+  twinkListCommand,
+  twinkShowCommand,
+  twinkCreateCommand,
+  twinkUpdateCommand,
+  twinkToggle2FACommand,
+  twinkDeleteCommand,
+  twinkVehicleAddCommand,
+  twinkVehicleRemoveCommand,
+  twinkVehicleUpdateCommand,
+  twinkFindCommand,
+  handleTwinkCreateModal,
+  handleTwinkUpdateModal,
+  handleTwinkVehicleAddModal,
+  handleTwinkVehicleRemoveSelect,
+  handleTwinkVehicleNationSelect,
+  handleTwinkVehicleTypeSelect,
+  handleTwinkVehicleUpdateButton,
+  handleTwinkVehicleUpdateEditModalButton,
+  handleTwinkVehicleUpdateNationSelect,
+  handleTwinkVehicleUpdateTypeSelect,
+  handleTwinkVehicleUpdateModal,
+  handleTwinkVehicleDeleteFromModalButton,
+  handleTwinkDeleteButton
+} from "./twinks";
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error, info } from "../utils/logger";
 import { checkPermission } from "../utils/permissions";
@@ -42,6 +95,7 @@ export function setupCommands(client: Client) {
     try {
       // --- обработка кнопок ---
       if (interaction.isButton()) {
+        info(`[COMMAND] Обработка кнопки: ${interaction.customId}`);
         // Обработка кнопок лётной академии
         if (interaction.customId.startsWith("type_") || 
             interaction.customId.startsWith("license_") || 
@@ -51,9 +105,53 @@ export function setupCommands(client: Client) {
           return;
         }
 
-        // Обработка кнопок управления самолётами
-        if (interaction.customId === "aircraft_list_back") {
-          await handleAircraftListBack(interaction);
+        // Обработка кнопок формы отсутствия
+        if (interaction.customId === "absence_form_button") {
+          await handleAbsenceFormButton(interaction);
+          return;
+        }
+
+        // Обработка кнопок заявок отсутствия (одобрить/отклонить/подробности)
+        if (interaction.customId.startsWith("approve_absence_") || 
+            interaction.customId.startsWith("reject_absence_") || 
+            interaction.customId.startsWith("view_details_")) {
+          await handleAbsenceTicketButton(interaction);
+          return;
+        }
+
+        // Обработка кнопок истории тикетов и деталей тикетов (но не опубликованных тикетов)
+        if ((interaction.customId.startsWith("ticket_history_") && 
+             !interaction.customId.startsWith("ticket_history_details_") && 
+             !interaction.customId.startsWith("ticket_history_messages_")) || 
+            interaction.customId.startsWith("ticket_details_")) {
+          await handleTicketHistoryButton(interaction);
+          return;
+        }
+
+        // Обработка кнопок опубликованных тикетов
+        if (interaction.customId.startsWith("ticket_history_details_")) {
+          info(`[COMMAND] Обработка кнопки опубликованного тикета: ${interaction.customId}`);
+          await handlePublishedTicketButton(interaction);
+          return;
+        }
+
+        // Обработка кнопок управления самолётами (удалено - больше не используется)
+        
+        // Обработка кнопок твинков
+        if (interaction.customId.startsWith("twink_delete_")) {
+          await handleTwinkDeleteButton(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_update_btn_")) {
+          await handleTwinkVehicleUpdateButton(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_update_edit_modal_")) {
+          await handleTwinkVehicleUpdateEditModalButton(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_delete_btn_")) {
+          await handleTwinkVehicleDeleteFromModalButton(interaction);
           return;
         }
         
@@ -150,11 +248,28 @@ export function setupCommands(client: Client) {
 
         // Проверяем разрешения пользователя
         info(`[COMMAND] Проверяем разрешения для пользователя ${interaction.user.tag}`);
-        const hasAccess = await checkPermission(interaction);
-        info(`[COMMAND] Результат проверки разрешений: ${hasAccess}`);
-        if (!hasAccess) {
-          info(`[COMMAND] Доступ запрещён, выходим`);
-          return;
+        
+        // Специальная проверка для команд твинков (все команды требуют прав)
+        const twinkCommands = ["twink-help", "twink-list", "twink-show", "twink-create", "twink-update", "twink-toggle-2fa", "twink-delete", "twink-vehicle-add", "twink-vehicle-remove", "twink-vehicle-update", "twink-find"];
+        
+        if (twinkCommands.includes(commandName)) {
+          const { hasTwinkAdminRole } = await import("./twinks.js");
+          if (!hasTwinkAdminRole(interaction)) {
+            await interaction.reply({
+              content: "❌ У вас нет прав для работы с твинками. Требуется роль офицера или выше.",
+              ephemeral: true
+            });
+            info(`[COMMAND] Доступ запрещён для команды ${commandName}`);
+            return;
+          }
+        } else {
+          // Для остальных команд используем общую проверку
+          const hasAccess = await checkPermission(interaction);
+          info(`[COMMAND] Результат проверки разрешений: ${hasAccess}`);
+          if (!hasAccess) {
+            info(`[COMMAND] Доступ запрещён, выходим`);
+            return;
+          }
         }
 
         info(`[COMMAND] Переходим к switch statement для команды: ${commandName}`);
@@ -204,6 +319,51 @@ export function setupCommands(client: Client) {
           case "flight-academy":
             await flightAcademyCommand(interaction);
             break;
+          case "absenceform":
+            await absenceformCommand(interaction);
+            break;
+          case "absencelist":
+            await absencelistCommand(interaction);
+            break;
+          case "ticket-history":
+            await ticketHistoryCommand(interaction, 0);
+            break;
+          case "publish-tickets":
+            await publishTicketsCommand(interaction);
+            break;
+          case "twink-help":
+            await twinkHelpCommand(interaction);
+            break;
+          case "twink-list":
+            await twinkListCommand(interaction);
+            break;
+          case "twink-show":
+            await twinkShowCommand(interaction);
+            break;
+          case "twink-create":
+            await twinkCreateCommand(interaction);
+            break;
+          case "twink-update":
+            await twinkUpdateCommand(interaction);
+            break;
+          case "twink-toggle-2fa":
+            await twinkToggle2FACommand(interaction);
+            break;
+          case "twink-delete":
+            await twinkDeleteCommand(interaction);
+            break;
+          case "twink-vehicle-add":
+            await twinkVehicleAddCommand(interaction);
+            break;
+          case "twink-vehicle-remove":
+            await twinkVehicleRemoveCommand(interaction);
+            break;
+          case "twink-vehicle-update":
+            await twinkVehicleUpdateCommand(interaction);
+            break;
+          case "twink-find":
+            await twinkFindCommand(interaction);
+            break;
         case "aircraft-list":
           info(`[COMMAND] 🎯 ПОПАЛИ В CASE aircraft-list для пользователя ${interaction.user.tag}`);
           info(`[COMMAND] Выполняется команда aircraft-list для пользователя ${interaction.user.tag}`);
@@ -243,6 +403,49 @@ export function setupCommands(client: Client) {
           await flightAcademyModal(interaction);
           return;
         }
+        
+        // Обработка модальных окон формы отсутствия
+        if (interaction.customId === "absence_form_modal") {
+          await handleAbsenceFormModal(interaction);
+          return;
+        }
+        
+        // Обработка модальных окон закрытия тикетов
+        if (interaction.customId.startsWith("close_ticket_modal_")) {
+          // Передаем обработку в flight-academy.ts
+          const { handleModalSubmit } = await import("./flight-academy");
+          await handleModalSubmit(interaction);
+          return;
+        }
+        
+        
+        // Обработка модальных окон самолётов
+        if (interaction.customId.startsWith("aircraft_add_modal")) {
+          await handleAircraftAddModal(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("aircraft_update_modal")) {
+          await handleAircraftUpdateModal(interaction);
+          return;
+        }
+        
+        // Обработка модальных окон твинков
+        if (interaction.customId === "twink_create_modal") {
+          await handleTwinkCreateModal(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_update_modal_")) {
+          await handleTwinkUpdateModal(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_add_modal_")) {
+          await handleTwinkVehicleAddModal(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_update_modal_")) {
+          await handleTwinkVehicleUpdateModal(interaction);
+          return;
+        }
       }
 
       // --- обработка селекторов ---
@@ -251,8 +454,48 @@ export function setupCommands(client: Client) {
           await flightAcademyAircraftSelect(interaction);
           return;
         }
+        
+        // Обработка селекторов самолётов
         if (interaction.customId === "aircraft_type_select") {
           await handleAircraftTypeSelect(interaction);
+          return;
+        }
+        if (interaction.customId === "aircraft_remove_type_select") {
+          await handleAircraftRemoveTypeSelect(interaction);
+          return;
+        }
+        if (interaction.customId === "aircraft_remove_select") {
+          await handleAircraftRemoveSelect(interaction);
+          return;
+        }
+        if (interaction.customId === "aircraft_update_type_select") {
+          await handleAircraftUpdateTypeSelect(interaction);
+          return;
+        }
+        if (interaction.customId === "aircraft_update_select") {
+          await handleAircraftUpdateSelect(interaction);
+          return;
+        }
+        
+        // Обработка селекторов твинков
+        if (interaction.customId.startsWith("twink_vehicle_remove_select_")) {
+          await handleTwinkVehicleRemoveSelect(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_nation_select_")) {
+          await handleTwinkVehicleNationSelect(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_type_select_")) {
+          await handleTwinkVehicleTypeSelect(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_update_nation_")) {
+          await handleTwinkVehicleUpdateNationSelect(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith("twink_vehicle_update_type_")) {
+          await handleTwinkVehicleUpdateTypeSelect(interaction);
           return;
         }
       }

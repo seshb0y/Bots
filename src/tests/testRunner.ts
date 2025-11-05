@@ -3,10 +3,8 @@ import { utilsTests } from './utilsTests';
 import { commandsTests } from './commandsTests';
 import { dataTests } from './dataTests';
 import { networkTests } from './networkTests';
-<<<<<<< HEAD
-=======
 import { statsTests } from './statsTests';
->>>>>>> feature/absence-thread-integration
+import { twinksTests } from './twinksTests';
 import { info, error } from '../utils/logger';
 
 export interface TestResult {
@@ -41,12 +39,9 @@ export async function runAllTests(): Promise<TestSuiteResult> {
     { name: "Утилиты", tests: utilsTests },
     { name: "Команды", tests: commandsTests },
     { name: "Данные", tests: dataTests },
-<<<<<<< HEAD
-    { name: "Сеть", tests: networkTests }
-=======
     { name: "Сеть", tests: networkTests },
-    { name: "Статистика", tests: statsTests }
->>>>>>> feature/absence-thread-integration
+    { name: "Статистика", tests: statsTests },
+    { name: "Твинки", tests: twinksTests }
   ];
 
   const result: TestSuiteResult = {
@@ -93,6 +88,26 @@ export async function runAllTests(): Promise<TestSuiteResult> {
 
     result.suiteResults[suite.name] = suiteResult;
     info(`📊 ${suite.name}: ${suiteResult.passed}/${suiteResult.total} тестов пройдено`);
+  }
+
+  // Восстанавливаем оригинальный файл твинков после всех тестов
+  if (typeof (global as any).restoreTwinkHistoryFile === 'function') {
+    try {
+      (global as any).restoreTwinkHistoryFile();
+      info(`📁 Восстановлен оригинальный файл истории твинков`);
+    } catch (err) {
+      error(`❌ Ошибка при восстановлении файла истории твинков:`, err);
+    }
+  }
+  
+  // Восстанавливаем файл после тестов обновления техники
+  if (typeof (global as any).restoreTwinkHistoryFileAfterVehicleUpdateTests === 'function') {
+    try {
+      (global as any).restoreTwinkHistoryFileAfterVehicleUpdateTests();
+      info(`📁 Восстановлен файл истории твинков после тестов обновления техники`);
+    } catch (err) {
+      error(`❌ Ошибка при восстановлении файла после тестов обновления техники:`, err);
+    }
   }
 
   return result;

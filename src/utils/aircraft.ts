@@ -1,11 +1,6 @@
-<<<<<<< HEAD
-import { loadJson, saveJson } from "./json.js";
-import { info, error } from "./logger.js";
-=======
 import { loadJson, saveJson } from "./json";
 import { info, error } from "./logger";
 import { getDataFilePath } from "./paths";
->>>>>>> feature/absence-thread-integration
 
 // Типы самолётов
 export type AircraftType = 'piston' | 'early_jet' | 'modern_jet';
@@ -14,11 +9,6 @@ export type AircraftType = 'piston' | 'early_jet' | 'modern_jet';
 export interface Aircraft {
   name: string;
   type: AircraftType;
-<<<<<<< HEAD
-  br: string;
-  nation: string;
-=======
->>>>>>> feature/absence-thread-integration
 }
 
 // Структура данных для хранения списков самолётов
@@ -29,11 +19,7 @@ interface AircraftData {
 }
 
 // Путь к файлу с данными самолётов
-<<<<<<< HEAD
-const AIRCRAFT_DATA_FILE = "data/aircraft.json";
-=======
 const AIRCRAFT_DATA_FILE = getDataFilePath("aircraft.json");
->>>>>>> feature/absence-thread-integration
 
 // Функция для загрузки данных о самолётах
 export function loadAircraftData(): AircraftData {
@@ -148,11 +134,7 @@ export function createAircraftOptions(aircraft: Aircraft[]): Array<{ label: stri
   return aircraft.map(a => ({
     label: a.name,
     value: a.name,
-<<<<<<< HEAD
-    description: `${a.nation} | БР ${a.br}`
-=======
-    description: `Тип: ${getAircraftTypeName(a.type)}`
->>>>>>> feature/absence-thread-integration
+    description: getAircraftTypeName(a.type)
   }));
 }
 
@@ -198,23 +180,6 @@ function getDefaultAircraftData(): AircraftData {
     piston: [
       {
         name: "Bf 109 F-4",
-<<<<<<< HEAD
-        type: "piston",
-        br: "4.3",
-        nation: "Германия"
-      },
-      {
-        name: "Spitfire Mk.Vb",
-        type: "piston",
-        br: "4.7",
-        nation: "Великобритания"
-      },
-      {
-        name: "P-51D-30",
-        type: "piston",
-        br: "5.0",
-        nation: "США"
-=======
         type: "piston"
       },
       {
@@ -224,29 +189,11 @@ function getDefaultAircraftData(): AircraftData {
       {
         name: "P-51D-30",
         type: "piston"
->>>>>>> feature/absence-thread-integration
       }
     ],
     early_jet: [
       {
         name: "Me 262 A-1",
-<<<<<<< HEAD
-        type: "early_jet",
-        br: "7.7",
-        nation: "Германия"
-      },
-      {
-        name: "MiG-15",
-        type: "early_jet",
-        br: "8.7",
-        nation: "СССР"
-      },
-      {
-        name: "F-86F-2",
-        type: "early_jet",
-        br: "8.7",
-        nation: "США"
-=======
         type: "early_jet"
       },
       {
@@ -256,29 +203,11 @@ function getDefaultAircraftData(): AircraftData {
       {
         name: "F-86F-2",
         type: "early_jet"
->>>>>>> feature/absence-thread-integration
       }
     ],
     modern_jet: [
       {
         name: "MiG-21bis",
-<<<<<<< HEAD
-        type: "modern_jet",
-        br: "10.3",
-        nation: "СССР"
-      },
-      {
-        name: "F-4E Phantom II",
-        type: "modern_jet",
-        br: "11.0",
-        nation: "США"
-      },
-      {
-        name: "Su-27",
-        type: "modern_jet",
-        br: "12.0",
-        nation: "СССР"
-=======
         type: "modern_jet"
       },
       {
@@ -288,7 +217,6 @@ function getDefaultAircraftData(): AircraftData {
       {
         name: "Su-27",
         type: "modern_jet"
->>>>>>> feature/absence-thread-integration
       }
     ]
   };

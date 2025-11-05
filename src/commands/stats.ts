@@ -17,8 +17,6 @@ export async function statsCommand(interaction: ChatInputCommandInteraction) {
   // Получаем свежие данные через API
   const curr = await fetchClanPoints("ALLIANCE");
 
-<<<<<<< HEAD
-=======
   // Проверяем, есть ли данные для сравнения
   if (prev.length === 0) {
     await interaction.editReply(
@@ -33,8 +31,6 @@ export async function statsCommand(interaction: ChatInputCommandInteraction) {
     );
     return;
   }
-
->>>>>>> feature/absence-thread-integration
   // Сопоставим по нормализованному нику
   const prevMap = new Map<string, { nick: string; points: number }>();
   for (const p of prev) prevMap.set(normalize(p.nick), p);
