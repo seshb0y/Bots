@@ -632,6 +632,82 @@ export async function twinkVehicleRemoveCommand(interaction: ChatInputCommandInt
   }
 }
 
+// Вспомогательная функция для создания списка техники с кнопками
+function createVehicleListWithButtons(twink: TwinkData): { embed: EmbedBuilder; buttonRows: ActionRowBuilder<ButtonBuilder>[] } {
+  // Группируем технику по нациям и типам
+  const grouped = groupVehiclesByNation(twink.vehicles);
+  const vehicleList: string[] = [];
+  const buttons: ButtonBuilder[] = [];
+  
+  // Создаём маппинг техники по индексам для точного определения индекса
+  const vehicleIndexMap = new Map<string, number>();
+  twink.vehicles.forEach((vehicle: Vehicle, index: number) => {
+    const key = `${vehicle.name}|${vehicle.br}|${vehicle.nation}|${vehicle.type}`;
+    // Если ключ уже есть, это дубликат - используем первый индекс
+    if (!vehicleIndexMap.has(key)) {
+      vehicleIndexMap.set(key, index);
+    }
+  });
+  
+  // Сортируем технику и создаём список с кнопками
+  Object.entries(grouped).forEach(([key, vehicles]) => {
+    const [nation, type] = key.split('_');
+    const nationName = NATION_NAMES[nation as NationCode];
+    const typeName = VEHICLE_TYPE_NAMES[type as VehicleType];
+    
+    // Сортируем по BR (убывание)
+    vehicles.sort((a, b) => b.br - a.br);
+    
+    vehicleList.push(`**${nationName} - ${typeName}:**`);
+    
+    vehicles.forEach((vehicle) => {
+      const mapKey = `${vehicle.name}|${vehicle.br}|${vehicle.nation}|${vehicle.type}`;
+      const vehicleIndex = vehicleIndexMap.get(mapKey);
+      
+      if (vehicleIndex !== undefined) {
+        vehicleList.push(`• **${vehicle.br}** ${vehicle.name}`);
+        
+        // Создаём кнопку для каждой техники с корректным индексом
+        const button = new ButtonBuilder()
+          .setCustomId(`twink_vehicle_update_btn_${twink.id}_${vehicleIndex}`)
+          .setLabel(`Изменить ${vehicle.name.substring(0, 20)}`)
+          .setStyle(ButtonStyle.Secondary);
+        
+        buttons.push(button);
+        
+      } else {
+        error(`[TWINK-VEHICLE-UPDATE] Не найден индекс для техники: ${vehicle.name} (BR ${vehicle.br}, ${nationName}, ${typeName})`);
+      }
+    });
+    
+    vehicleList.push(''); // Пустая строка между группами
+  });
+  
+  // Discord ограничивает до 5 ActionRows и 5 компонентов в каждом (25 кнопок максимум)
+  const maxButtons = 25;
+  const displayButtons = buttons.slice(0, maxButtons);
+  
+  // Разбиваем кнопки на ряды (по 5 в каждом)
+  const buttonRows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < displayButtons.length; i += 5) {
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    row.addComponents(displayButtons.slice(i, i + 5));
+    buttonRows.push(row);
+  }
+  
+  const embed = new EmbedBuilder()
+    .setTitle(`✏️ Редактирование техники твинка: ${twink.username}`)
+    .setDescription(vehicleList.join('\n'))
+    .setColor(0xffaa00)
+    .setFooter({ 
+      text: buttons.length > maxButtons 
+        ? `Показано ${maxButtons} из ${buttons.length} техники. Для редактирования остальных используйте команду повторно.`
+        : `Нажмите кнопку "Изменить" у нужной техники для редактирования.`
+    });
+  
+  return { embed, buttonRows };
+}
+
 // Команда для редактирования техники
 export async function twinkVehicleUpdateCommand(interaction: ChatInputCommandInteraction) {
   try {
@@ -665,79 +741,7 @@ export async function twinkVehicleUpdateCommand(interaction: ChatInputCommandInt
       return;
     }
     
-    // Группируем технику по нациям и типам
-    const grouped = groupVehiclesByNation(twink.vehicles);
-    const vehicleList: string[] = [];
-    const buttons: ButtonBuilder[] = [];
-    
-    
-    // Создаём маппинг техники по индексам для точного определения индекса
-    const vehicleIndexMap = new Map<string, number>();
-    twink.vehicles.forEach((vehicle: Vehicle, index: number) => {
-      const key = `${vehicle.name}|${vehicle.br}|${vehicle.nation}|${vehicle.type}`;
-      // Если ключ уже есть, это дубликат - используем первый индекс
-      if (!vehicleIndexMap.has(key)) {
-        vehicleIndexMap.set(key, index);
-      }
-    });
-    
-    
-    // Сортируем технику и создаём список с кнопками
-    Object.entries(grouped).forEach(([key, vehicles]) => {
-      const [nation, type] = key.split('_');
-      const nationName = NATION_NAMES[nation as NationCode];
-      const typeName = VEHICLE_TYPE_NAMES[type as VehicleType];
-      
-      // Сортируем по BR (убывание)
-      vehicles.sort((a, b) => b.br - a.br);
-      
-      vehicleList.push(`**${nationName} - ${typeName}:**`);
-      
-      vehicles.forEach((vehicle) => {
-        const mapKey = `${vehicle.name}|${vehicle.br}|${vehicle.nation}|${vehicle.type}`;
-        const vehicleIndex = vehicleIndexMap.get(mapKey);
-        
-        if (vehicleIndex !== undefined) {
-          vehicleList.push(`• **${vehicle.br}** ${vehicle.name}`);
-          
-          // Создаём кнопку для каждой техники с корректным индексом
-          const button = new ButtonBuilder()
-            .setCustomId(`twink_vehicle_update_btn_${twink.id}_${vehicleIndex}`)
-            .setLabel(`Изменить ${vehicle.name.substring(0, 20)}`)
-            .setStyle(ButtonStyle.Secondary);
-          
-          buttons.push(button);
-          
-        } else {
-          error(`[TWINK-VEHICLE-UPDATE] Не найден индекс для техники: ${vehicle.name} (BR ${vehicle.br}, ${nationName}, ${typeName})`);
-        }
-      });
-      
-      vehicleList.push(''); // Пустая строка между группами
-    });
-    
-    
-    // Discord ограничивает до 5 ActionRows и 5 компонентов в каждом (25 кнопок максимум)
-    const maxButtons = 25;
-    const displayButtons = buttons.slice(0, maxButtons);
-    
-    // Разбиваем кнопки на ряды (по 5 в каждом)
-    const buttonRows: ActionRowBuilder<ButtonBuilder>[] = [];
-    for (let i = 0; i < displayButtons.length; i += 5) {
-      const row = new ActionRowBuilder<ButtonBuilder>();
-      row.addComponents(displayButtons.slice(i, i + 5));
-      buttonRows.push(row);
-    }
-    
-    const embed = new EmbedBuilder()
-      .setTitle(`✏️ Редактирование техники твинка: ${twink.username}`)
-      .setDescription(vehicleList.join('\n'))
-      .setColor(0xffaa00)
-      .setFooter({ 
-        text: buttons.length > maxButtons 
-          ? `Показано ${maxButtons} из ${buttons.length} техники. Для редактирования остальных используйте команду повторно.`
-          : `Нажмите кнопку "Изменить" у нужной техники для редактирования.`
-      });
+    const { embed, buttonRows } = createVehicleListWithButtons(twink);
     
     await interaction.reply({ 
       embeds: [embed], 
@@ -1415,10 +1419,22 @@ export async function handleTwinkVehicleUpdateButton(interaction: any) {
     
     if (vehicleIndex < 0 || vehicleIndex >= twink.vehicles.length) {
       error(`[TWINK-VEHICLE-UPDATE-BUTTON] Некорректный индекс техники: ${vehicleIndex} (всего техники: ${twink.vehicles.length})`);
-      await interaction.reply({
-        content: `❌ Некорректный индекс техники (${vehicleIndex})`,
-        ephemeral: true
-      });
+      
+      // Если у твинка есть техника, отправляем обновлённый список
+      if (twink.vehicles.length > 0) {
+        const { embed, buttonRows } = createVehicleListWithButtons(twink);
+        await interaction.reply({
+          content: `⚠️ Индекс техники устарел (техника была удалена). Используйте обновлённый список ниже:`,
+          embeds: [embed],
+          components: buttonRows,
+          ephemeral: true
+        });
+      } else {
+        await interaction.reply({
+          content: `❌ Некорректный индекс техники. У твинка больше нет техники.`,
+          ephemeral: true
+        });
+      }
       return;
     }
     
@@ -1518,11 +1534,32 @@ export async function handleTwinkVehicleUpdateEditModalButton(interaction: any) 
     const vehicleIndex = parseInt(vehicleIndexStr);
     
     const twink = findTwinkById(twinkId);
-    if (!twink || vehicleIndex < 0 || vehicleIndex >= twink.vehicles.length) {
+    if (!twink) {
       await interaction.reply({
-        content: "❌ Твинк или техника не найдены",
+        content: "❌ Твинк не найден",
         ephemeral: true
       });
+      return;
+    }
+    
+    if (vehicleIndex < 0 || vehicleIndex >= twink.vehicles.length) {
+      error(`[TWINK-VEHICLE-UPDATE-EDIT-MODAL] Некорректный индекс техники: ${vehicleIndex} (всего техники: ${twink.vehicles.length})`);
+      
+      // Если у твинка есть техника, отправляем обновлённый список
+      if (twink.vehicles.length > 0) {
+        const { embed, buttonRows } = createVehicleListWithButtons(twink);
+        await interaction.reply({
+          content: `⚠️ Индекс техники устарел (техника была удалена). Используйте обновлённый список ниже:`,
+          embeds: [embed],
+          components: buttonRows,
+          ephemeral: true
+        });
+      } else {
+        await interaction.reply({
+          content: `❌ Некорректный индекс техники. У твинка больше нет техники.`,
+          ephemeral: true
+        });
+      }
       return;
     }
     
@@ -1611,10 +1648,22 @@ export async function handleTwinkVehicleUpdateNationSelect(interaction: any) {
     
     if (vehicleIndex < 0 || vehicleIndex >= twink.vehicles.length) {
       error(`[TWINK-VEHICLE-UPDATE-NATION] Некорректный индекс техники: ${vehicleIndex} (всего техники: ${twink.vehicles.length})`);
-      await interaction.reply({
-        content: `❌ Некорректный индекс техники (${vehicleIndex})`,
-        ephemeral: true
-      });
+      
+      // Если у твинка есть техника, отправляем обновлённый список
+      if (twink.vehicles.length > 0) {
+        const { embed, buttonRows } = createVehicleListWithButtons(twink);
+        await interaction.reply({
+          content: `⚠️ Индекс техники устарел (техника была удалена). Используйте обновлённый список ниже:`,
+          embeds: [embed],
+          components: buttonRows,
+          ephemeral: true
+        });
+      } else {
+        await interaction.reply({
+          content: `❌ Некорректный индекс техники. У твинка больше нет техники.`,
+          ephemeral: true
+        });
+      }
       return;
     }
     
@@ -1693,6 +1742,16 @@ export async function handleTwinkVehicleUpdateNationSelect(interaction: any) {
       ephemeral: true 
     });
     
+    // Отправляем обновлённый список техники после изменения
+    if (updatedTwink) {
+      const { embed: listEmbed, buttonRows: listButtonRows } = createVehicleListWithButtons(updatedTwink);
+      await interaction.followUp({
+        content: `📋 Обновлённый список техники:`,
+        embeds: [listEmbed],
+        components: listButtonRows,
+        ephemeral: true
+      });
+    }
     
   } catch (err) {
     error(`[TWINK] Ошибка при обновлении нации техники:`, err);
@@ -1748,10 +1807,22 @@ export async function handleTwinkVehicleUpdateTypeSelect(interaction: any) {
     
     if (vehicleIndex < 0 || vehicleIndex >= twink.vehicles.length) {
       error(`[TWINK-VEHICLE-UPDATE-TYPE] Некорректный индекс техники: ${vehicleIndex} (всего техники: ${twink.vehicles.length})`);
-      await interaction.reply({
-        content: `❌ Некорректный индекс техники (${vehicleIndex})`,
-        ephemeral: true
-      });
+      
+      // Если у твинка есть техника, отправляем обновлённый список
+      if (twink.vehicles.length > 0) {
+        const { embed, buttonRows } = createVehicleListWithButtons(twink);
+        await interaction.reply({
+          content: `⚠️ Индекс техники устарел (техника была удалена). Используйте обновлённый список ниже:`,
+          embeds: [embed],
+          components: buttonRows,
+          ephemeral: true
+        });
+      } else {
+        await interaction.reply({
+          content: `❌ Некорректный индекс техники. У твинка больше нет техники.`,
+          ephemeral: true
+        });
+      }
       return;
     }
     
@@ -1830,6 +1901,16 @@ export async function handleTwinkVehicleUpdateTypeSelect(interaction: any) {
       ephemeral: true 
     });
     
+    // Отправляем обновлённый список техники после изменения
+    if (updatedTwink) {
+      const { embed: listEmbed, buttonRows: listButtonRows } = createVehicleListWithButtons(updatedTwink);
+      await interaction.followUp({
+        content: `📋 Обновлённый список техники:`,
+        embeds: [listEmbed],
+        components: listButtonRows,
+        ephemeral: true
+      });
+    }
     
   } catch (err) {
     error(`[TWINK] Ошибка при обновлении типа техники:`, err);
@@ -1884,10 +1965,22 @@ export async function handleTwinkVehicleUpdateModal(interaction: ModalSubmitInte
     
     if (vehicleIndex < 0 || vehicleIndex >= twink.vehicles.length) {
       error(`[TWINK-VEHICLE-UPDATE-MODAL] Некорректный индекс техники: ${vehicleIndex} (всего техники: ${twink.vehicles.length})`);
-      await interaction.reply({
-        content: `❌ Некорректный индекс техники (${vehicleIndex})`,
-        ephemeral: true
-      });
+      
+      // Если у твинка есть техника, отправляем обновлённый список
+      if (twink.vehicles.length > 0) {
+        const { embed, buttonRows } = createVehicleListWithButtons(twink);
+        await interaction.reply({
+          content: `⚠️ Индекс техники устарел (техника была удалена). Используйте обновлённый список ниже:`,
+          embeds: [embed],
+          components: buttonRows,
+          ephemeral: true
+        });
+      } else {
+        await interaction.reply({
+          content: `❌ Некорректный индекс техники. У твинка больше нет техники.`,
+          ephemeral: true
+        });
+      }
       return;
     }
     
@@ -1947,6 +2040,15 @@ export async function handleTwinkVehicleUpdateModal(interaction: ModalSubmitInte
     await interaction.reply({
       content: `✅ Название и BR техники успешно обновлены!`,
       embeds: [embed],
+      ephemeral: true
+    });
+    
+    // Отправляем обновлённый список техники после изменения
+    const { embed: listEmbed, buttonRows: listButtonRows } = createVehicleListWithButtons(updatedTwink);
+    await interaction.followUp({
+      content: `📋 Обновлённый список техники:`,
+      embeds: [listEmbed],
+      components: listButtonRows,
       ephemeral: true
     });
     
@@ -2032,14 +2134,29 @@ export async function handleTwinkVehicleDeleteFromModalButton(interaction: any) 
       return;
     }
     
-    const embed = createTwinkEmbed(updatedTwink);
-    
+    // Обновляем модальное окно с информацией об удалении
     await interaction.update({
       content: `✅ Техника **${vehicleName}** успешно удалена!`,
-      embeds: [embed],
+      embeds: [],
       components: []
     });
     
+    // Если у твинка осталась техника, отправляем обновлённый список техники
+    if (updatedTwink.vehicles.length > 0) {
+      const { embed, buttonRows } = createVehicleListWithButtons(updatedTwink);
+      
+      await interaction.followUp({
+        content: `📋 Обновлённый список техники (индексы пересчитаны):`,
+        embeds: [embed],
+        components: buttonRows,
+        ephemeral: true
+      });
+    } else {
+      await interaction.followUp({
+        content: `ℹ️ У твинка **${updatedTwink.username}** больше нет техники.`,
+        ephemeral: true
+      });
+    }
     
   } catch (err) {
     error(`[TWINK] Ошибка при удалении техники из модального окна:`, err);

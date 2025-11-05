@@ -91,6 +91,7 @@ export async function testTwinkVehicleUpdate(): Promise<TestResult[]> {
   results.push(await testVehicleUpdateInvalidIndex());
   results.push(await testVehicleUpdateIndexStability());
   results.push(await testVehicleUpdateWithDuplicateNames());
+  results.push(await testVehicleListAfterUpdate());
   
   return results;
 }
@@ -685,6 +686,254 @@ async function testVehicleUpdateWithDuplicateNames(): Promise<TestResult> {
         name,
         success: false,
         error: "Параметры техники с BR 5.7 изменились",
+        duration: Date.now() - start
+      };
+    }
+    
+    return {
+      name,
+      success: true,
+      duration: Date.now() - start
+    };
+    
+  } catch (err: any) {
+    return {
+      name,
+      success: false,
+      error: err.message || "Неизвестная ошибка",
+      duration: Date.now() - start
+    };
+  }
+}
+
+/**
+ * Тест: проверка корректности списка техники после обновления
+ * Проверяет, что после обновления техники индексы остаются корректными
+ * и техника находится по правильному индексу
+ */
+async function testVehicleListAfterUpdate(): Promise<TestResult> {
+  const start = Date.now();
+  const name = "Корректность списка техники после обновления";
+  
+  try {
+    cleanupTestDataAfterTest();
+    
+    const twink = createTwink("TestTwink", "test-user-id");
+    
+    // Добавляем несколько техник
+    const vehicles: Vehicle[] = [
+      { name: "T-34", br: 4.0, nation: 'ru', type: 'ground' },
+      { name: "Sherman", br: 5.0, nation: 'us', type: 'ground' },
+      { name: "Tiger", br: 5.7, nation: 'de', type: 'ground' }
+    ];
+    
+    vehicles.forEach(v => addVehicleToTwink(twink.id, v, "test-user-id"));
+    
+    const beforeUpdate = findTwinkById(twink.id);
+    if (!beforeUpdate || beforeUpdate.vehicles.length !== 3) {
+      return {
+        name,
+        success: false,
+        error: "Не удалось добавить технику",
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что все техники присутствуют перед обновлением
+    const beforeNames = beforeUpdate.vehicles.map((v: Vehicle) => v.name);
+    const hasT34 = beforeUpdate.vehicles.some((v: Vehicle) => v.name === "T-34");
+    const hasSherman = beforeUpdate.vehicles.some((v: Vehicle) => v.name === "Sherman");
+    const hasTiger = beforeUpdate.vehicles.some((v: Vehicle) => v.name === "Tiger");
+    
+    if (!hasT34 || !hasSherman || !hasTiger) {
+      return {
+        name,
+        success: false,
+        error: `Не все техники присутствуют перед обновлением. Список: ${beforeNames.join(', ')}`,
+        duration: Date.now() - start
+      };
+    }
+    
+    // Находим индекс техники Sherman (она должна быть в списке)
+    const vehicleIndex = beforeUpdate.vehicles.findIndex((v: Vehicle) => v.name === "Sherman");
+    if (vehicleIndex === -1) {
+      return {
+        name,
+        success: false,
+        error: `Техника Sherman не найдена в списке. Список: ${beforeNames.join(', ')}`,
+        duration: Date.now() - start
+      };
+    }
+    
+    const originalVehicle = beforeUpdate.vehicles[vehicleIndex];
+    
+    // Обновляем нацию
+    const success1 = updateVehicleInTwink(twink.id, vehicleIndex, { nation: 'ru' as NationCode }, "test-user-id");
+    if (!success1) {
+      return {
+        name,
+        success: false,
+        error: "Не удалось обновить нацию техники",
+        duration: Date.now() - start
+      };
+    }
+    
+    const afterNationUpdate = findTwinkById(twink.id);
+    if (!afterNationUpdate || afterNationUpdate.vehicles.length !== 3) {
+      return {
+        name,
+        success: false,
+        error: "Количество техники изменилось после обновления нации",
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что техника по индексу 1 обновилась
+    const vehicleAfterNation = afterNationUpdate.vehicles[vehicleIndex];
+    if (vehicleAfterNation.nation !== 'ru') {
+      return {
+        name,
+        success: false,
+        error: `Нация не обновилась: ожидалось 'ru', получено '${vehicleAfterNation.nation}'`,
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что другие поля не изменились
+    if (vehicleAfterNation.name !== originalVehicle.name || 
+        vehicleAfterNation.br !== originalVehicle.br ||
+        vehicleAfterNation.type !== originalVehicle.type) {
+      return {
+        name,
+        success: false,
+        error: "Другие поля техники изменились при обновлении нации",
+        duration: Date.now() - start
+      };
+    }
+    
+    // Обновляем тип техники
+    const success2 = updateVehicleInTwink(twink.id, vehicleIndex, { type: 'airplane' as VehicleType }, "test-user-id");
+    if (!success2) {
+      return {
+        name,
+        success: false,
+        error: "Не удалось обновить тип техники",
+        duration: Date.now() - start
+      };
+    }
+    
+    const afterTypeUpdate = findTwinkById(twink.id);
+    if (!afterTypeUpdate || afterTypeUpdate.vehicles.length !== 3) {
+      return {
+        name,
+        success: false,
+        error: "Количество техники изменилось после обновления типа",
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что техника по индексу 1 обновилась
+    const vehicleAfterType = afterTypeUpdate.vehicles[vehicleIndex];
+    if (vehicleAfterType.type !== 'airplane') {
+      return {
+        name,
+        success: false,
+        error: `Тип не обновился: ожидалось 'airplane', получено '${vehicleAfterType.type}'`,
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что нация осталась обновлённой
+    if (vehicleAfterType.nation !== 'ru') {
+      return {
+        name,
+        success: false,
+        error: `Нация не сохранилась после обновления типа: ожидалось 'ru', получено '${vehicleAfterType.nation}'`,
+        duration: Date.now() - start
+      };
+    }
+    
+    // Обновляем название и BR
+    const success3 = updateVehicleInTwink(twink.id, vehicleIndex, { name: "Sherman M4A1", br: 5.3 }, "test-user-id");
+    if (!success3) {
+      return {
+        name,
+        success: false,
+        error: "Не удалось обновить название и BR техники",
+        duration: Date.now() - start
+      };
+    }
+    
+    const afterNameUpdate = findTwinkById(twink.id);
+    if (!afterNameUpdate || afterNameUpdate.vehicles.length !== 3) {
+      return {
+        name,
+        success: false,
+        error: "Количество техники изменилось после обновления названия и BR",
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что техника по индексу 1 обновилась
+    const vehicleAfterName = afterNameUpdate.vehicles[vehicleIndex];
+    if (vehicleAfterName.name !== "Sherman M4A1" || vehicleAfterName.br !== 5.3) {
+      return {
+        name,
+        success: false,
+        error: `Название или BR не обновились: ожидалось "Sherman M4A1" (BR 5.3), получено "${vehicleAfterName.name}" (BR ${vehicleAfterName.br})`,
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что другие поля сохранились
+    if (vehicleAfterName.nation !== 'ru' || vehicleAfterName.type !== 'airplane') {
+      return {
+        name,
+        success: false,
+        error: `Другие поля не сохранились: ожидалось nation='ru', type='airplane', получено nation='${vehicleAfterName.nation}', type='${vehicleAfterName.type}'`,
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что другие техники всё ещё присутствуют в списке
+    // (их позиции могут измениться из-за сортировки по BR, но это нормально)
+    const allVehicleNames = afterNameUpdate.vehicles.map((v: Vehicle) => v.name);
+    const t34Vehicle = afterNameUpdate.vehicles.find((v: Vehicle) => v.name === "T-34");
+    const tigerVehicle = afterNameUpdate.vehicles.find((v: Vehicle) => v.name === "Tiger");
+    
+    if (!t34Vehicle) {
+      return {
+        name,
+        success: false,
+        error: `Техника T-34 не найдена в списке после обновления. Список техники: ${allVehicleNames.join(', ')}`,
+        duration: Date.now() - start
+      };
+    }
+    
+    if (!tigerVehicle) {
+      return {
+        name,
+        success: false,
+        error: `Техника Tiger не найдена в списке после обновления. Список техники: ${allVehicleNames.join(', ')}`,
+        duration: Date.now() - start
+      };
+    }
+    
+    // Проверяем, что параметры других техник не изменились
+    if (t34Vehicle.br !== 4.0 || t34Vehicle.nation !== 'ru' || t34Vehicle.type !== 'ground') {
+      return {
+        name,
+        success: false,
+        error: "Параметры техники T-34 изменились после обновления другой техники",
+        duration: Date.now() - start
+      };
+    }
+    
+    if (tigerVehicle.br !== 5.7 || tigerVehicle.nation !== 'de' || tigerVehicle.type !== 'ground') {
+      return {
+        name,
+        success: false,
+        error: "Параметры техники Tiger изменились после обновления другой техники",
         duration: Date.now() - start
       };
     }
