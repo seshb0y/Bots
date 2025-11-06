@@ -1989,8 +1989,12 @@ export async function handleTwinkVehicleUpdateModal(interaction: ModalSubmitInte
     const brStr = interaction.fields.getTextInputValue('vehicle_br').trim();
     const br = parseFloat(brStr);
     
+    info(`[TWINK-VEHICLE-UPDATE-MODAL] Начало обновления техники: twinkId=${twinkId}, vehicleIndex=${vehicleIndex}`);
+    info(`[TWINK-VEHICLE-UPDATE-MODAL] Старая техника: name="${oldVehicle.name}", br=${oldVehicle.br}, nation=${oldVehicle.nation}, type=${oldVehicle.type}`);
+    info(`[TWINK-VEHICLE-UPDATE-MODAL] Новые данные: name="${name}", brStr="${brStr}", br=${br}`);
     
     if (!name) {
+      error(`[TWINK-VEHICLE-UPDATE-MODAL] Название техники пустое`);
       await interaction.reply({
         content: "❌ Название техники не может быть пустым",
         ephemeral: true
@@ -1999,6 +2003,7 @@ export async function handleTwinkVehicleUpdateModal(interaction: ModalSubmitInte
     }
     
     if (isNaN(br) || br < 0 || br > 15) {
+      error(`[TWINK-VEHICLE-UPDATE-MODAL] Некорректный BR: brStr="${brStr}", parsed=${br}, isNaN=${isNaN(br)}`);
       await interaction.reply({
         content: "❌ BR должен быть числом от 0 до 15",
         ephemeral: true
@@ -2007,10 +2012,13 @@ export async function handleTwinkVehicleUpdateModal(interaction: ModalSubmitInte
     }
     
     // Обновляем только название и BR (нация и тип обновляются через селекторы)
+    info(`[TWINK-VEHICLE-UPDATE-MODAL] Вызов updateVehicleInTwink: twinkId=${twinkId}, vehicleIndex=${vehicleIndex}, name="${name}", br=${br}`);
     const success = updateVehicleInTwink(twinkId, vehicleIndex, { name, br }, interaction.user.id);
     
+    info(`[TWINK-VEHICLE-UPDATE-MODAL] Результат updateVehicleInTwink: success=${success}`);
+    
     if (!success) {
-      error(`[TWINK-VEHICLE-UPDATE-MODAL] Ошибка при обновлении техники`);
+      error(`[TWINK-VEHICLE-UPDATE-MODAL] Ошибка при обновлении техники: функция вернула false`);
       await interaction.reply({
         content: "❌ Ошибка при обновлении техники",
         ephemeral: true
@@ -2021,6 +2029,7 @@ export async function handleTwinkVehicleUpdateModal(interaction: ModalSubmitInte
     
     const updatedTwink = findTwinkById(twinkId);
     if (!updatedTwink) {
+      error(`[TWINK-VEHICLE-UPDATE-MODAL] Твинк не найден после обновления: twinkId=${twinkId}`);
       await interaction.reply({
         content: "❌ Ошибка при обновлении техники",
         ephemeral: true
@@ -2028,9 +2037,23 @@ export async function handleTwinkVehicleUpdateModal(interaction: ModalSubmitInte
       return;
     }
     
-    const updatedVehicle = updatedTwink.vehicles.find((v, idx) => 
+    info(`[TWINK-VEHICLE-UPDATE-MODAL] Твинк найден после обновления: vehicles.length=${updatedTwink.vehicles.length}`);
+    
+    if (vehicleIndex >= updatedTwink.vehicles.length) {
+      error(`[TWINK-VEHICLE-UPDATE-MODAL] Индекс техники выходит за границы после обновления: vehicleIndex=${vehicleIndex}, vehicles.length=${updatedTwink.vehicles.length}`);
+    }
+    
+    const updatedVehicle = updatedTwink.vehicles.find((v: Vehicle, idx: number) => 
       idx === vehicleIndex || (v.name === name && v.br === br)
     ) || updatedTwink.vehicles[vehicleIndex];
+    
+    if (!updatedVehicle) {
+      error(`[TWINK-VEHICLE-UPDATE-MODAL] Техника не найдена после обновления: vehicleIndex=${vehicleIndex}, vehicles.length=${updatedTwink.vehicles.length}`);
+      error(`[TWINK-VEHICLE-UPDATE-MODAL] Список техники: ${updatedTwink.vehicles.map((v: Vehicle, i: number) => `${i}: ${v.name} (BR ${v.br})`).join(', ')}`);
+    } else {
+      info(`[TWINK-VEHICLE-UPDATE-MODAL] Техника после обновления: name="${updatedVehicle.name}", br=${updatedVehicle.br}, nation=${updatedVehicle.nation}, type=${updatedVehicle.type}`);
+      info(`[TWINK-VEHICLE-UPDATE-MODAL] Сравнение: старое BR=${oldVehicle.br}, новое BR=${br}, фактическое BR=${updatedVehicle.br}`);
+    }
     
     const embed = new EmbedBuilder()
       .setTitle('✅ Техника обновлена')

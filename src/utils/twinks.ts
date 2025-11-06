@@ -291,18 +291,21 @@ export function updateVehicleInTwink(
   updatedVehicle: Partial<Vehicle> & { name?: string },
   updatedBy?: string
 ): boolean {
+  info(`[UPDATE-VEHICLE] Начало обновления: twinkId=${id}, vehicleIndex=${vehicleIndex}, updatedVehicle=${JSON.stringify(updatedVehicle)}`);
+  
   const history = loadTwinkHistory();
   const twinkIndex = history.twinks.findIndex((twink: TwinkData) => twink.id === id);
   
   if (twinkIndex === -1) {
-    error(`Твинк с ID ${id} не найден`);
+    error(`[UPDATE-VEHICLE] Твинк с ID ${id} не найден`);
     return false;
   }
   
   const twink = history.twinks[twinkIndex];
+  info(`[UPDATE-VEHICLE] Твинк найден: username=${twink.username}, vehicles.length=${twink.vehicles.length}`);
   
   if (vehicleIndex < 0 || vehicleIndex >= twink.vehicles.length) {
-    error(`Индекс техники ${vehicleIndex} вне диапазона`);
+    error(`[UPDATE-VEHICLE] Индекс техники ${vehicleIndex} вне диапазона (всего техники: ${twink.vehicles.length})`);
     return false;
   }
   
@@ -314,19 +317,27 @@ export function updateVehicleInTwink(
   const oldNation = vehicle.nation;
   const oldType = vehicle.type;
   
+  info(`[UPDATE-VEHICLE] Старая техника: name="${oldName}", br=${oldBr}, nation=${oldNation}, type=${oldType}`);
+  
   // Обновляем поля
   if (updatedVehicle.name !== undefined) {
+    info(`[UPDATE-VEHICLE] Обновление name: "${oldName}" -> "${updatedVehicle.name}"`);
     vehicle.name = updatedVehicle.name;
   }
   if (updatedVehicle.br !== undefined) {
+    info(`[UPDATE-VEHICLE] Обновление br: ${oldBr} -> ${updatedVehicle.br}`);
     vehicle.br = updatedVehicle.br;
   }
   if (updatedVehicle.nation !== undefined) {
+    info(`[UPDATE-VEHICLE] Обновление nation: ${oldNation} -> ${updatedVehicle.nation}`);
     vehicle.nation = updatedVehicle.nation;
   }
   if (updatedVehicle.type !== undefined) {
+    info(`[UPDATE-VEHICLE] Обновление type: ${oldType} -> ${updatedVehicle.type}`);
     vehicle.type = updatedVehicle.type;
   }
+  
+  info(`[UPDATE-VEHICLE] Техника после обновления: name="${vehicle.name}", br=${vehicle.br}, nation=${vehicle.nation}, type=${vehicle.type}`);
   
   twink.updatedAt = new Date().toISOString();
   twink.updatedBy = updatedBy;
@@ -335,7 +346,10 @@ export function updateVehicleInTwink(
   // Сортировка должна происходить только при добавлении новой техники
   // Это критично для корректной работы индексов при редактировании
   
+  info(`[UPDATE-VEHICLE] Сохранение истории твинков...`);
   saveTwinkHistory(history);
+  info(`[UPDATE-VEHICLE] История сохранена успешно`);
+  
   return true;
 }
 
