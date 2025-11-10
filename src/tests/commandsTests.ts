@@ -37,8 +37,20 @@ async function testCommandImports(): Promise<TestResult> {
       }
     }
     
-    // Пробуем импортировать основной файл команд
-    const commandsIndex = require('../commands/index');
+    let commandsIndex: any;
+    try {
+      commandsIndex = require('../commands/index');
+    } catch (srcError: any) {
+      try {
+        const distPath = path.join(__dirname, '..', '..', 'dist', 'commands', 'index.js');
+        if (!fs.existsSync(distPath)) {
+          throw srcError;
+        }
+        commandsIndex = require(distPath);
+      } catch (distError) {
+        throw srcError;
+      }
+    }
     
     const expectedExports = [
       'helpCommand',

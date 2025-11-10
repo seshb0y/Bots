@@ -21,6 +21,7 @@ import {
   VOICE_CHANNEL_IDS,
   STATS_CHANNEL_ID,
 } from "./constants";
+import { ensureRegimentWelcomeMessage } from "./features/regiment-application";
 import { loadJson, saveJson } from "./utils/json";
 import { UserData, TrackedPlayer } from "./types";
 import { getDataFilePath } from "./utils/paths";
@@ -799,6 +800,12 @@ client.once("ready", async () => {
   if (!guild) return;
 
   info(`Бот запущен. Пользователь: ${client.user?.tag}`);
+
+  try {
+    await ensureRegimentWelcomeMessage(client);
+  } catch (welcomeErr) {
+    warn("Не удалось подготовить приветственное сообщение заявок", welcomeErr);
+  }
 
   for (const channelId of VOICE_CHANNEL_IDS) {
     const channel = await guild.channels.fetch(channelId);

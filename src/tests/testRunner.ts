@@ -5,6 +5,7 @@ import { dataTests } from './dataTests';
 import { networkTests } from './networkTests';
 import { statsTests } from './statsTests';
 import { twinksTests } from './twinksTests';
+import { regimentApplicationTests } from './regimentApplicationTests';
 import { info, error } from '../utils/logger';
 
 export interface TestResult {
@@ -41,7 +42,8 @@ export async function runAllTests(): Promise<TestSuiteResult> {
     { name: "Данные", tests: dataTests },
     { name: "Сеть", tests: networkTests },
     { name: "Статистика", tests: statsTests },
-    { name: "Твинки", tests: twinksTests }
+    { name: "Твинки", tests: twinksTests },
+    { name: "Заявки в полк", tests: regimentApplicationTests },
   ];
 
   const result: TestSuiteResult = {

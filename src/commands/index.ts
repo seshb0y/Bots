@@ -1,4 +1,4 @@
-import { Client, Interaction, ChatInputCommandInteraction, ButtonInteraction, TextChannel } from "discord.js";
+import { Client, Interaction, ChatInputCommandInteraction, TextChannel } from "discord.js";
 import { helpCommand } from "./help";
 import { pointsCommand } from "./points";
 import { addtracerCommand } from "./addtracer";
@@ -72,6 +72,30 @@ import {
 import { setPbAnnounced } from "../utils/pbNotify";
 import { logCommand, logInteraction, error, info } from "../utils/logger";
 import { checkPermission } from "../utils/permissions";
+import {
+  REGIMENT_APPLICATION_MODAL_ID,
+  REGIMENT_APPLICATION_MODAL_BATTLES_ID,
+  REGIMENT_APPLICATION_BATTLES_BUTTON_ID,
+  REGIMENT_APPLICATION_APPROVE_MODAL_PREFIX,
+  REGIMENT_APPLICATION_REJECT_MODAL_PREFIX,
+  REGIMENT_APPLICATION_EDIT_MODAL_ID,
+  REGIMENT_APPLICATION_EDIT_MODAL_BATTLES_ID,
+  handleRegimentApplicationButton,
+  handleRegimentApplicationContinueButton,
+  handleRegimentApplicationDecision,
+  handleRegimentApplicationModal,
+  handleRegimentApprovalModal,
+  handleRegimentRejectionModal,
+  handleRegimentApplicationEditButton,
+  handleRegimentApplicationEditContinueButton,
+  handleRegimentEditModal,
+  handleRegimentEditBattlesModal,
+  isRegimentApplicationButton,
+  isRegimentApplicationContinueButton,
+  isRegimentApplicationEditButton,
+  isRegimentApplicationEditContinueButton,
+  tryParseRegimentDecision,
+} from "../features/regiment-application";
 
 export {
   helpCommand,
@@ -96,6 +120,32 @@ export function setupCommands(client: Client) {
       // --- обработка кнопок ---
       if (interaction.isButton()) {
         info(`[COMMAND] Обработка кнопки: ${interaction.customId}`);
+
+        if (isRegimentApplicationButton(interaction.customId)) {
+          await handleRegimentApplicationButton(interaction);
+          return;
+        }
+
+        if (isRegimentApplicationContinueButton(interaction.customId)) {
+          await handleRegimentApplicationContinueButton(interaction);
+          return;
+        }
+
+        if (isRegimentApplicationEditButton(interaction.customId)) {
+          await handleRegimentApplicationEditButton(interaction);
+          return;
+        }
+
+        if (isRegimentApplicationEditContinueButton(interaction.customId)) {
+          await handleRegimentApplicationEditContinueButton(interaction);
+          return;
+        }
+
+        const regimentDecision = tryParseRegimentDecision(interaction.customId);
+        if (regimentDecision) {
+          await handleRegimentApplicationDecision(interaction, regimentDecision);
+          return;
+        }
         // Обработка кнопок лётной академии
         if (interaction.customId.startsWith("type_") || 
             interaction.customId.startsWith("license_") || 
@@ -399,6 +449,26 @@ export function setupCommands(client: Client) {
       
       // --- обработка модальных окон ---
       if (interaction.isModalSubmit()) {
+        if (interaction.customId === REGIMENT_APPLICATION_MODAL_ID || interaction.customId === REGIMENT_APPLICATION_MODAL_BATTLES_ID) {
+          await handleRegimentApplicationModal(interaction);
+          return;
+        }
+        if (interaction.customId === REGIMENT_APPLICATION_EDIT_MODAL_ID || interaction.customId === REGIMENT_APPLICATION_EDIT_MODAL_BATTLES_ID) {
+          if (interaction.customId === REGIMENT_APPLICATION_EDIT_MODAL_ID) {
+            await handleRegimentEditModal(interaction);
+          } else {
+            await handleRegimentEditBattlesModal(interaction);
+          }
+          return;
+        }
+        if (interaction.customId.startsWith(REGIMENT_APPLICATION_APPROVE_MODAL_PREFIX)) {
+          await handleRegimentApprovalModal(interaction);
+          return;
+        }
+        if (interaction.customId.startsWith(REGIMENT_APPLICATION_REJECT_MODAL_PREFIX)) {
+          await handleRegimentRejectionModal(interaction);
+          return;
+        }
         if (interaction.customId.startsWith("academy_form_") || interaction.customId.startsWith("training_form_")) {
           await flightAcademyModal(interaction);
           return;
