@@ -890,7 +890,7 @@ export async function handleRegimentApplicationModal(interaction: ModalSubmitInt
     };
 
     const embed = buildApplicationEmbed(interaction.user.id, interaction.user.tag, answers, submissionId, applicantMember);
-    const uniqueRoleIds = Array.from(new Set(OFFICER_ROLE_IDS));
+    const uniqueRoleIds = Array.from(new Set(REGIMENT_APPLICATION_APPROVER_ROLE_IDS));
     const officerMentions = uniqueRoleIds.length ? uniqueRoleIds.map((roleId) => `<@&${roleId}>`).join(" ") : "";
     const content = officerMentions
       ? `${officerMentions} Новая заявка от <@${interaction.user.id}>`
